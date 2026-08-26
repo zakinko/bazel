@@ -60,6 +60,10 @@ public final class ConstraintConstants {
           OS.FREEBSD,
           ConstraintValueInfo.create(
               OS_CONSTRAINT_SETTING,
+              Label.parseCanonicalUnchecked("@platforms//os:netbsd")),
+          OS.NETBSD,
+          ConstraintValueInfo.create(
+              OS_CONSTRAINT_SETTING,
               Label.parseCanonicalUnchecked("@platforms//os:openbsd")),
           OS.OPENBSD,
           ConstraintValueInfo.create(

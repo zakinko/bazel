@@ -29,6 +29,10 @@ cc_library(
             "blaze_util_bsd.cc",
             "blaze_util_posix.cc",
         ],
+        "//src/conditions:netbsd": [
+            "blaze_util_bsd.cc",
+            "blaze_util_posix.cc",
+        ],
         "//src/conditions:openbsd": [
             "blaze_util_bsd.cc",
             "blaze_util_posix.cc",
@@ -51,6 +55,8 @@ cc_library(
             "-framework CoreFoundation",
         ],
         "//src/conditions:freebsd": [
+        ],
+        "//src/conditions:netbsd": [
         ],
         "//src/conditions:openbsd": [
         ],
@@ -115,6 +121,8 @@ cc_binary(
         "//src/conditions:freebsd": [
             "-lprocstat",
             "-lm",
+        ],
+        "//src/conditions:netbsd": [
         ],
         "//src/conditions:openbsd": [
         ],

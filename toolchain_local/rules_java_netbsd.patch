@@ -1,0 +1,31 @@
+diff -u -r a/toolchains/BUILD b/toolchains/BUILD
+--- a/toolchains/BUILD	2026-08-26 09:16:10.496332353 +0000
++++ b/toolchains/BUILD	2026-08-26 09:45:31.303382970 +0000
+@@ -125,6 +125,11 @@
+ )
+ 
+ java_runtime_files(
++    name = "jni_md_header-netbsd",
++    srcs = ["include/netbsd/jni_md.h"],
++)
++
++java_runtime_files(
+     name = "jni_md_header-openbsd",
+     srcs = ["include/openbsd/jni_md.h"],
+ )
+@@ -146,6 +151,7 @@
+         "@bazel_tools//src/conditions:linux_riscv64": [":jni_md_header-linux"],
+         "@bazel_tools//src/conditions:linux_s390x": [":jni_md_header-linux"],
+         "@bazel_tools//src/conditions:linux_x86_64": [":jni_md_header-linux"],
++        "@bazel_tools//src/conditions:netbsd": [":jni_md_header-netbsd"],
+         "@bazel_tools//src/conditions:openbsd": [":jni_md_header-openbsd"],
+         "@bazel_tools//src/conditions:windows": [":jni_md_header-windows"],
+         "//conditions:default": [],
+@@ -159,6 +165,7 @@
+         "@bazel_tools//src/conditions:linux_riscv64": ["include/linux"],
+         "@bazel_tools//src/conditions:linux_s390x": ["include/linux"],
+         "@bazel_tools//src/conditions:linux_x86_64": ["include/linux"],
++        "@bazel_tools//src/conditions:netbsd": ["include/netbsd"],
+         "@bazel_tools//src/conditions:openbsd": ["include/openbsd"],
+         "@bazel_tools//src/conditions:windows": ["include/win32"],
+         "//conditions:default": [],

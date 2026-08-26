@@ -1,0 +1,12 @@
+diff -u -r a/host/extension.bzl b/host/extension.bzl
+--- a/host/extension.bzl	2026-08-26 09:45:31.293430867 +0000
++++ b/host/extension.bzl	2026-08-26 09:45:31.295095603 +0000
+@@ -24,6 +24,8 @@
+         return "osx"
+     if os.startswith("freebsd"):
+         return "freebsd"
++    if os.startswith("netbsd"):
++        return "netbsd"
+     if os.startswith("openbsd"):
+         return "openbsd"
+     if os.startswith("linux"):

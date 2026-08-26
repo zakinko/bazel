@@ -59,7 +59,7 @@ bazel_dep(name = "rules_swift", version = "3.3.0")  # with repo_name = None, ver
 bazel_dep(name = "rules_apple", version = "4.3.1", repo_name = None)
 bazel_dep(name = "google_benchmark", version = "1.9.4", repo_name = None)
 bazel_dep(name = "onetbb", version = "2022.2.0", repo_name = None)
-bazel_dep(name = "rules_go", version = "0.59.0", repo_name = None)  # Required for loads of CcInfo
+bazel_dep(name = "rules_go", version = "0.59.0")  # Required for loads of CcInfo
 
 # bazel_dep overrides
 single_version_override(
@@ -84,7 +84,10 @@ single_version_override(
 single_version_override(
     module_name = "zstd-jni",
     patch_strip = 1,
-    patches = ["//third_party:zstd-jni.patch"],
+    patches = [
+        "//third_party:zstd-jni.patch",
+        "//toolchain_local:zstd_jni_netbsd.patch",
+    ],
 )
 
 single_version_override(
@@ -136,6 +139,35 @@ local_path_override(
     module_name = "remoteapis",
     path = "./third_party/remoteapis",
 )
+
+# NetBSD is not among the platforms these modules know about.
+#   platforms   host detection returns no @platforms//os value, so every
+#               select() on //src/conditions:netbsd would miss.
+#   rules_java  has no jni_md_header for NetBSD.
+#   rules_go    downloads a Go SDK that is not published for NetBSD; use the
+#               one installed on this machine instead.
+single_version_override(
+    module_name = "platforms",
+    patch_strip = 1,
+    patches = ["//toolchain_local:platforms_netbsd.patch"],
+)
+
+single_version_override(
+    module_name = "rules_java",
+    patch_strip = 1,
+    patches = ["//toolchain_local:rules_java_netbsd.patch"],
+)
+
+single_version_override(
+    module_name = "rules_go",
+    patch_strip = 1,
+    patches = ["//toolchain_local:rules_go_netbsd.patch"],
+    version = "0.59.0",
+)
+
+go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
+go_sdk.host(name = "go_default_sdk")
+
 
 # =========================================
 # Java dependencies

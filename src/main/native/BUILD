@@ -6,6 +6,7 @@ genrule(
     srcs = select({
         "//src/conditions:darwin": ["@rules_java//toolchains:jni_md_header-darwin"],
         "//src/conditions:freebsd": ["@rules_java//toolchains:jni_md_header-freebsd"],
+        "//src/conditions:netbsd": ["@rules_java//toolchains:jni_md_header-netbsd"],
         "//src/conditions:openbsd": ["@rules_java//toolchains:jni_md_header-openbsd"],
         "//src/conditions:windows": ["@rules_java//toolchains:jni_md_header-windows"],
         "//conditions:default": ["@rules_java//toolchains:jni_md_header-linux"],
@@ -41,6 +42,7 @@ filegroup(
             "darwin/util.h",
         ],
         "//src/conditions:freebsd": ["unix_jni_bsd.cc"],
+        "//src/conditions:netbsd": ["unix_jni_bsd.cc"],
         "//src/conditions:openbsd": ["unix_jni_bsd.cc"],
         "//conditions:default": ["unix_jni_linux.cc"],
     }),

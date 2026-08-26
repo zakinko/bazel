@@ -22,6 +22,7 @@ cc_library(
     name = "process-tools",
     srcs = ["process-tools.cc"] + select({
         "//src/conditions:darwin": ["process-tools-darwin.cc"],
+        "//src/conditions:netbsd": ["process-tools-darwin.cc"],
         "//src/conditions:openbsd": ["process-tools-darwin.cc"],
         "//conditions:default": ["process-tools-linux.cc"],
     }),
@@ -68,6 +69,7 @@ cc_binary(
     srcs = select({
         "//src/conditions:darwin": ["dummy-sandbox.c"],
         "//src/conditions:freebsd": ["dummy-sandbox.c"],
+        "//src/conditions:netbsd": ["dummy-sandbox.c"],
         "//src/conditions:openbsd": ["dummy-sandbox.c"],
         "//src/conditions:windows": ["dummy-sandbox.c"],
         "//conditions:default": [
@@ -82,6 +84,7 @@ cc_binary(
     linkopts = select({
         "//src/conditions:darwin": [],
         "//src/conditions:freebsd": [],
+        "//src/conditions:netbsd": [],
         "//src/conditions:openbsd": [],
         "//src/conditions:windows": [],
         "//conditions:default": [
@@ -92,6 +95,7 @@ cc_binary(
     deps = select({
         "//src/conditions:darwin": [],
         "//src/conditions:freebsd": [],
+        "//src/conditions:netbsd": [],
         "//src/conditions:openbsd": [],
         "//src/conditions:windows": [],
         "//conditions:default": [

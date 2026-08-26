@@ -160,6 +160,12 @@ config_setting(
 )
 
 config_setting(
+    name = "netbsd",
+    constraint_values = ["@platforms//os:netbsd"],
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
     name = "openbsd",
     constraint_values = ["@platforms//os:openbsd"],
     visibility = ["//visibility:public"],

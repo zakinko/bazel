@@ -21,6 +21,7 @@ sh_binary(
     srcs = select({
         "//src/conditions:darwin": ["md5_darwin_freebsd.sh"],
         "//src/conditions:freebsd": ["md5_darwin_freebsd.sh"],
+        "//src/conditions:netbsd": ["md5_netbsd.sh"],
         "//src/conditions:openbsd": ["md5_openbsd.sh"],
         "//conditions:default": ["md5_default.sh"],
     }),
@@ -329,6 +330,7 @@ genrule(
     outs = ["package-bazel-on-host-platform.sh"],
     cmd = select({
         "//src/conditions:freebsd": "cat $(SRCS) | sed -e 's@#!/bin/bash@#!/usr/local/bin/bash@' > $@",
+        "//src/conditions:netbsd": "cat $(SRCS) | sed -e 's@#!/bin/bash@#!/usr/pkg/bin/bash@' > $@",
         "//src/conditions:openbsd": "cat $(SRCS) | sed -e 's@#!/bin/bash@#!/usr/local/bin/bash@' > $@",
         "//conditions:default": "cp $(SRCS) $@",
     }),
