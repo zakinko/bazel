@@ -116,3 +116,27 @@ jobs:
             export PLAIN=1
             export EXTRA_BAZEL_ARGS="--tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2"
             sh ci/bsd-bootstrap.sh
+
+  ghostbsd:
+    name: GhostBSD (plain)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Make room on the runner
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: vmactions/ghostbsd-vm@4695f191a42fd12ec60a375adde35275c01d6b8e # v1.0.3
+        with:
+          usesh: true
+          mem: 8192
+          copyback: false
+          prepare: |
+            mount -t procfs proc /proc || true
+            pkg install -y openjdk21 python3 zip unzip bash git wget gmake
+          run: |
+            export JAVA_HOME=/usr/local/openjdk21
+            export PATH=$JAVA_HOME/bin:/usr/local/bin:$PATH
+            export SRCDIR=$(pwd)
+            export PATCH859="$(pwd)/ci/rules_cc_859.patch"
+            export PLAIN=1
+            export EXTRA_BAZEL_ARGS="--tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2"
+            sh ci/bsd-bootstrap.sh
