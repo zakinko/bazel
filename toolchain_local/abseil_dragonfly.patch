@@ -32,20 +32,21 @@ diff -u -r a/absl/base/internal/sysinfo.cc b/absl/base/internal/sysinfo.cc
  #include <pthread_np.h>
  #endif
  
-@@ -475,6 +475,13 @@
+@@ -474,6 +474,14 @@
+   // pid_t type without loss of precision, but a zx_koid_t (64-bits) cannot.
    return static_cast<pid_t>(zx_thread_self());
  }
- 
++
 +#elif defined(__DragonFly__)
 +
-+// DragonFly's pthread_t is a pointer, so the fallback below cannot cast it.
-+// pthread_getthreadid_np() gives the LWP id, which is what NetBSD reads
-+// through _lwp_self().
++// Without an arm here DragonFly falls through to the fallback below, and
++// static_cast<pid_t>(pthread_self()) does not compile on any of these BSDs -
++// FreeBSD, NetBSD and OpenBSD never reach it because each has its own arm.
++// pthread_getthreadid_np() is the same call FreeBSD uses.
 +pid_t GetTID() { return static_cast<pid_t>(pthread_getthreadid_np()); }
-+
+ 
  #else
  
- // Fallback implementation of `GetTID` using `pthread_self`.
 diff -u -r a/absl/debugging/internal/vdso_support.cc b/absl/debugging/internal/vdso_support.cc
 --- a/absl/debugging/internal/vdso_support.cc
 +++ b/absl/debugging/internal/vdso_support.cc
