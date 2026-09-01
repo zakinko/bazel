@@ -1,0 +1,213 @@
+# NetBSD 対応を四つの BSD で確かめる。
+#
+# どの BSD も port に JDK 21 があるので、同じ compile.sh で bootstrap できる。
+# NetBSD だけを見るのではなく四方向で建てることで、当て物が FreeBSD や
+# OpenBSD を壊していないことも同時に見る。
+name: BSD
+
+# 枝の名前では縛らない。どの枝に押しても、pull request でも回る。
+# 費用は paths で絞る: この四つの外を触ったときに 2 時間半の VM を四本
+# 立てても、分かることは無い。
+on:
+  push:
+    paths: &bsd_paths
+      - 'src/**'
+      - 'scripts/**'
+      - 'tools/**'
+      - 'toolchain_local/**'
+      - 'MODULE.bazel'
+      - 'ci/bsd-bootstrap.sh'
+      - '.github/workflows/bsd.yml'
+  pull_request:
+    paths: *bsd_paths
+  workflow_dispatch:
+
+# head_ref を先に見る。そうしないと push の ref と pull_request の ref が
+# 別物になり、同じ枝で二重に走る。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # aarch64 は hosted runner では完走しない。arm64 の runner に /dev/kvm が
+  # 無いので vmactions の qemu は TCG で回り、amd64 の 2 時間半に対して
+  #
+  #	NetBSD aarch64   5 時間 51 分で 2,845/5,570
+  #	OpenBSD aarch64  5 時間 50 分で 2,362/5,570
+  #
+  # の速さしか出ない。全部で 11 時間ほどかかる計算で、GitHub の job の上限
+  # 6 時間を越える。移植の問題ではないので、頼まれたときだけ回す。
+  netbsd:
+    name: NetBSD ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      # push では amd64 だけを組む。aarch64 は matrix に入れないので job 自体が
+      # 現れない。step を if で止める形にすると、全部 skip した job が success
+      # として集計されて「aarch64 も通っている」と読めてしまう。
+      matrix:
+        include: ${{ fromJSON(github.event_name == 'push'
+          && '[{"arch":"amd64","runner":"ubuntu-latest","vmarch":""}]'
+          || '[{"arch":"amd64","runner":"ubuntu-latest","vmarch":""},{"arch":"aarch64","runner":"ubuntu-24.04-arm","vmarch":"aarch64"}]') }}
+    steps:
+      # VM のディスクは runner の / から取る。runner には使わないものが
+      # 数十 GB 居座っていて、その分だけ VM が痩せる。bazel の output base は
+      # 太るので先に空ける。
+      - name: Make room on the runner
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: vmactions/netbsd-vm@6334c835de4c04a59fe59f0f8f071e02a2f0bab3 # v1
+        with:
+          release: "11.0"
+          arch: ${{ matrix.vmarch }}
+          usesh: true
+          mem: 8192
+          copyback: false
+          prepare: |
+            set -e
+            # cdn の openjdk21 は X11 の共有ライブラリに依存している。VM には
+            # X の set が入っていないので、先に xbase だけ展開しておく。
+            # NetBSD の uname -m は port の名前 (amd64, evbarm) を返す。
+            # x86_64 や aarch64 を返すのは uname -p の方。
+            SET=$(uname -m)
+            [ "$SET" = evbarm ] && SET="evbarm-$(uname -p)"
+            ftp -o /tmp/xbase.tar.xz "https://cdn.NetBSD.org/pub/NetBSD/NetBSD-11.0/$SET/binary/sets/xbase.tar.xz"
+            tar -C / -xf /tmp/xbase.tar.xz
+            test -f /usr/X11R7/lib/libX11.so.7
+            /usr/sbin/pkg_add -U pkgin
+            pkgin -y install openjdk21 bash zip unzip python313 go126 curl
+            test -x /usr/pkg/java/openjdk21/bin/javac
+          run: |
+            export JAVA_HOME=/usr/pkg/java/openjdk21
+            export PATH=/usr/pkg/bin:/usr/pkg/sbin:$PATH
+            export BAZEL_SH=/usr/pkg/bin/bash
+            export SRCDIR=$(pwd)
+            export EXTRA_BAZEL_ARGS="--tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --extra_toolchains=//toolchain_local:netbsd_python3_toolchain,//toolchain_local:local_jdk_21_runtime,//toolchain_local:local_jdk_21_bootstrap,//toolchain_local:local_jdk_21_runtime_v,//toolchain_local:local_jdk_21_bootstrap_v --jobs=2"
+            sh ci/bsd-bootstrap.sh
+
+  freebsd:
+    name: FreeBSD ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      # push では amd64 だけを組む。aarch64 は matrix に入れないので job 自体が
+      # 現れない。step を if で止める形にすると、全部 skip した job が success
+      # として集計されて「aarch64 も通っている」と読めてしまう。
+      matrix:
+        include: ${{ fromJSON(github.event_name == 'push'
+          && '[{"arch":"amd64","runner":"ubuntu-latest","vmarch":""}]'
+          || '[{"arch":"amd64","runner":"ubuntu-latest","vmarch":""},{"arch":"aarch64","runner":"ubuntu-24.04-arm","vmarch":"aarch64"}]') }}
+    steps:
+      # VM のディスクは runner の / から取る。runner には使わないものが
+      # 数十 GB 居座っていて、その分だけ VM が痩せる。bazel の output base は
+      # 太るので先に空ける。
+      - name: Make room on the runner
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: vmactions/freebsd-vm@f0552d3b69211736abd97f02ff3d4674c56b73b1 # v1
+        with:
+          arch: ${{ matrix.vmarch }}
+          usesh: true
+          mem: 8192
+          copyback: false
+          prepare: |
+            # openjdk21 の pkg-message が求めている。/proc が無いと JVM が
+            # 起動の途中で abort することがある (aarch64 で実際に落ちた)。
+            mount -t procfs proc /proc || true
+            mount -t fdescfs fdesc /dev/fd || true
+            pkg install -y openjdk21 bash zip unzip python3 go curl
+          run: |
+            export JAVA_HOME=/usr/local/openjdk21
+            export BAZEL_SH=/usr/local/bin/bash
+            export SRCDIR=$(pwd)
+            export EXTRA_BAZEL_ARGS="--tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2"
+            sh ci/bsd-bootstrap.sh
+
+  openbsd:
+    name: OpenBSD ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      # push では amd64 だけを組む。aarch64 は matrix に入れないので job 自体が
+      # 現れない。step を if で止める形にすると、全部 skip した job が success
+      # として集計されて「aarch64 も通っている」と読めてしまう。
+      matrix:
+        include: ${{ fromJSON(github.event_name == 'push'
+          && '[{"arch":"amd64","runner":"ubuntu-latest","vmarch":""}]'
+          || '[{"arch":"amd64","runner":"ubuntu-latest","vmarch":""},{"arch":"aarch64","runner":"ubuntu-24.04-arm","vmarch":"aarch64"}]') }}
+    steps:
+      # VM のディスクは runner の / から取る。runner には使わないものが
+      # 数十 GB 居座っていて、その分だけ VM が痩せる。bazel の output base は
+      # 太るので先に空ける。
+      - name: Make room on the runner
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: vmactions/openbsd-vm@86cdc08415d9d0865267e686561e276c52d62530 # v1
+        with:
+          arch: ${{ matrix.vmarch }}
+          usesh: true
+          mem: 8192
+          copyback: false
+          prepare: |
+            pkg_add -I jdk%21 bash zip unzip-- python%3 go curl
+          run: |
+            export JAVA_HOME=/usr/local/jdk-21
+            export BAZEL_SH=/usr/local/bin/bash
+            export SRCDIR=$(pwd)
+            export EXTRA_BAZEL_ARGS="--tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2"
+            sh ci/bsd-bootstrap.sh
+
+  # DragonFly BSD 自体が x86_64 専用なので、ここだけ arch は一つ。
+  #
+  # いまは通らない。bootstrap は rules_go の toolchain を要求し、rules_go は
+  # その OS の constraint を @platforms//os に求めるが、platforms に
+  # dragonfly は無い (netbsd も freebsd も openbsd もあるのに)。
+  #
+  #   no such target '@@rules_go+//go/toolchain:dragonflybsd'
+  #
+  # fork の中では解けないので、結果は記録するが赤で止めない。platforms に
+  # dragonfly が入れば自然に通るはず。
+  dragonflybsd:
+    name: DragonFly BSD
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 350
+    steps:
+      # VM のディスクは runner の / から取る。runner には使わないものが
+      # 数十 GB 居座っていて、その分だけ VM が痩せる。bazel の output base は
+      # 太るので先に空ける。
+      - name: Make room on the runner
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: vmactions/dragonflybsd-vm@7cd7c9b7f2b06e8e03d2337a9476995f3c112acf # v1
+        with:
+          usesh: true
+          mem: 8192
+          copyback: false
+          prepare: |
+            # DragonFly 6.4 の base は gcc 8 で、その libstdc++ は bazel が
+            # 要求する C++17 に足りない (cwchar が std::vswscanf を宣言せず、
+            # cctype が ::isblank を宣言しない)。dports の gcc14 を使う。
+            pkg install -y openjdk21 bash zip unzip python3 go curl gcc14
+          run: |
+            export JAVA_HOME=/usr/local/openjdk21
+            export BAZEL_SH=/usr/local/bin/bash
+            export SRCDIR=$(pwd)
+            export CC=/usr/local/bin/gcc14
+            export CXX=/usr/local/bin/g++14
+            # -std=c++17 は __STRICT_ANSI__ を立てる。DragonFly の
+            # sys/cdefs.h はそれを見て __ISO_C_VISIBLE を 1990 に落とすので、
+            # <wchar.h> の wcstof や <ctype.h> の isblank が見えなくなり、
+            # libstdc++ の <cwchar> が using ::wcstof で止まる。
+            #
+            # --cxxopt では届かない。あれは toolchain の flag の後ろに足す
+            # ものだが、exec 側 (default_host_platform-opt-exec) の abseil には
+            # -std=c++17 だけが渡っていた。BAZEL_CXXOPTS は cc_configure が
+            # toolchain そのものを組むときに読むので、どの configuration にも
+            # 効く。
+            export BAZEL_CXXOPTS=-std=gnu++17
+            export EXTRA_BAZEL_ARGS="--tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2 --repo_env=BAZEL_CXXOPTS=-std=gnu++17"
+            sh ci/bsd-bootstrap.sh
