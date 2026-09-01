@@ -178,6 +178,14 @@ unzip -q -o dist.zip
 rm -f dist.zip
 
 echo "=== この枝の変更を被せる"
+# PLAIN=1 のときは被せない。素の upstream がその BSD で建つかを測るため。
+if [ -n "$PLAIN" ]; then
+	echo "PLAIN=1 なので被せない。素の $DIST_URL を建てる"
+	cd "$WORK"
+	"${BAZEL_SH:-bash}" ./compile.sh
+	./output/bazel --version
+	exit $?
+fi
 cd "$SRCDIR"
 # ファイル単位の cp だと VM の中で十数分かかる。tar で流し込む。
 for d in src scripts tools third_party toolchain_local; do
