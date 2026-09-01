@@ -60,6 +60,7 @@ static int listen4(int *port)
 		return -1;
 	getsockname(s, (struct sockaddr *)&a, &l);
 	listen(s, 16);
+	fcntl(s, F_SETFL, fcntl(s, F_GETFL, 0) | O_NONBLOCK);
 	*port = ntohs(a.sin_port);
 	return s;
 }
@@ -126,7 +127,20 @@ int main(void)
 	printf("  %-28s AF_INET connect: %s\n", "A (control)",
 	    try_connect(c, (struct sockaddr *)&a, sizeof a));
 	close(c);
-	mapped_to(p4, "A (AF_INET listener)");
+	mapped_to(p4, "A (control not accepted)");
+
+	/* control 接続を受けてから、同じ listener でもう一度。peer の説では
+	 * 受けずに残した接続が待ち行列に居ることが効く。 */
+	{
+		int acc = accept(s4, NULL, NULL);
+		printf("  %-28s accept: %s\n", "A (drain)",
+		    acc < 0 ? strerror(errno) : "ok");
+		if (acc >= 0)
+			close(acc);
+		while ((acc = accept(s4, NULL, NULL)) >= 0)
+			close(acc);
+	}
+	mapped_to(p4, "A (queue drained)");
 
 	s6 = listen6(&p6);
 	if (s6 == -2) {
