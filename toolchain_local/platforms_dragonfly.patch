@@ -1,0 +1,27 @@
+diff -u -r a/os/BUILD b/os/BUILD
+--- a/os/BUILD
++++ b/os/BUILD
+@@ -13,6 +13,11 @@
+ 
+ constraint_setting(name = "os")
+ 
++constraint_value(
++    name = "dragonfly",
++    constraint_setting = ":os",
++)
++
+ constraint_value(
+     name = "freebsd",
+     constraint_setting = ":os",
+diff -u -r a/host/extension.bzl b/host/extension.bzl
+--- a/host/extension.bzl
++++ b/host/extension.bzl
+@@ -22,6 +22,8 @@
+ def _translate_os(os):
+     if os.startswith("mac os"):
+         return "osx"
++    if os.startswith("dragonfly"):
++        return "dragonfly"
+     if os.startswith("freebsd"):
+         return "freebsd"
+     if os.startswith("netbsd"):

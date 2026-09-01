@@ -87,6 +87,7 @@ single_version_override(
     patches = [
         "//third_party:zstd-jni.patch",
         "//toolchain_local:zstd_jni_netbsd.patch",
+        "//toolchain_local:zstd_jni_dragonfly.patch",
     ],
 )
 
@@ -145,17 +146,82 @@ local_path_override(
 #               select() on //src/conditions:netbsd would miss.
 #   rules_java  has no jni_md_header for NetBSD.
 #   rules_go    downloads a Go SDK that is not published for NetBSD; use the
-#               one installed on this machine instead.
+#               one installed on this machine instead.  It also takes the
+#               JVM's os.name for a GOOS, which is right everywhere except
+#               DragonFly, where the JVM says dragonflybsd and Go says
+#               dragonfly.
 single_version_override(
     module_name = "platforms",
     patch_strip = 1,
-    patches = ["//toolchain_local:platforms_netbsd.patch"],
+    patches = [
+        "//toolchain_local:platforms_netbsd.patch",
+        "//toolchain_local:platforms_dragonfly.patch",
+    ],
+)
+
+# c-ares picks its ares_config.h by OS and has no arm for DragonFly, so it
+# takes the Linux one, which sets HAVE_MALLOC_H.  There is no malloc.h on
+# DragonFly and the build stops on the first file that includes it:
+#
+#   ares_setup.h:112:12: fatal error: 'malloc.h' file not found
+#
+# The FreeBSD config is the right one for it.
+# abseil turns on ABSL_HAVE_ELF_MEM_IMAGE for anything with __ELF__ that is
+# not on its exclusion list, and DragonFly is not on it.  vdso_support.cc
+# then reaches for a type that only glibc spells that way:
+#
+#   vdso_support.cc:113:5: error: unknown type name 'Elf64_auxv_t'
+#
+# The file already carries aliases for the two BSDs it knows about - NetBSD
+# maps it to Aux64Info, FreeBSD to Elf64_Auxinfo - and DragonFly matches
+# FreeBSD.  Measured on 6.4.2: Elf64_Auxinfo and Elf32_Auxinfo are both
+# there, Aux64Info and Elf64_auxv_t are not.  So give it the same two lines
+# rather than switching the whole ELF mem image off, which is what an
+# earlier version of this patch did.
+#
+# The second hunk is a different problem in the same module.
+# time_zone_format.cc defines _XOPEN_SOURCE 500 unless it is on FreeBSD or
+# OpenBSD, and DragonFly is neither, so it gets it.  That drops
+# __ISO_C_VISIBLE from 2011 to 1990 and DragonFly's <wchar.h> stops
+# declaring vfwscanf and its neighbours, which libstdc++'s <cwchar> then
+# tries to pull into namespace std.  Measured directly:
+#
+#   no _XOPEN_SOURCE   __ISO_C_VISIBLE 2011   compiles
+#   -D_XOPEN_SOURCE=500 __ISO_C_VISIBLE 1990   fails on vfwscanf
+single_version_override(
+    module_name = "abseil-cpp",
+    patch_strip = 1,
+    patches = ["//toolchain_local:abseil_dragonfly.patch"],
+)
+
+# grpc detects the platform by a chain of #elif and has no arm for
+# DragonFly, so it falls off the end:
+#
+#   port_platform.h:527:2: error: "Could not auto-detect platform"
+#   :605 Must define exactly one of GPR_GCC_ATOMIC, GPR_GCC_SYNC, ...
+#   :609 Must define exactly one of GPR_ARCH_32, GPR_ARCH_64
+#
+# The FreeBSD block is the right shape for it, down to GPR_GCC_ATOMIC and
+# the _LP64 test.
+single_version_override(
+    module_name = "grpc",
+    patch_strip = 1,
+    patches = ["//toolchain_local:grpc_dragonfly.patch"],
+)
+
+single_version_override(
+    module_name = "c-ares",
+    patch_strip = 1,
+    patches = ["//toolchain_local:c_ares_dragonfly.patch"],
 )
 
 single_version_override(
     module_name = "rules_java",
     patch_strip = 1,
-    patches = ["//toolchain_local:rules_java_netbsd.patch"],
+    patches = [
+        "//toolchain_local:rules_java_netbsd.patch",
+        "//toolchain_local:rules_java_dragonfly.patch",
+    ],
 )
 
 single_version_override(

@@ -1,0 +1,30 @@
+--- a/toolchains/BUILD
++++ b/toolchains/BUILD
+@@ -125,6 +125,11 @@
+ )
+ 
+ java_runtime_files(
++    name = "jni_md_header-dragonfly",
++    srcs = ["include/dragonfly/jni_md.h"],
++)
++
++java_runtime_files(
+     name = "jni_md_header-netbsd",
+     srcs = ["include/netbsd/jni_md.h"],
+ )
+@@ -151,6 +156,7 @@
+         "@bazel_tools//src/conditions:linux_riscv64": [":jni_md_header-linux"],
+         "@bazel_tools//src/conditions:linux_s390x": [":jni_md_header-linux"],
+         "@bazel_tools//src/conditions:linux_x86_64": [":jni_md_header-linux"],
++        "@bazel_tools//src/conditions:dragonfly": [":jni_md_header-dragonfly"],
+         "@bazel_tools//src/conditions:netbsd": [":jni_md_header-netbsd"],
+         "@bazel_tools//src/conditions:openbsd": [":jni_md_header-openbsd"],
+         "@bazel_tools//src/conditions:windows": [":jni_md_header-windows"],
+@@ -165,6 +171,7 @@
+         "@bazel_tools//src/conditions:linux_riscv64": ["include/linux"],
+         "@bazel_tools//src/conditions:linux_s390x": ["include/linux"],
+         "@bazel_tools//src/conditions:linux_x86_64": ["include/linux"],
++        "@bazel_tools//src/conditions:dragonfly": ["include/dragonfly"],
+         "@bazel_tools//src/conditions:netbsd": ["include/netbsd"],
+         "@bazel_tools//src/conditions:openbsd": ["include/openbsd"],
+         "@bazel_tools//src/conditions:windows": ["include/win32"],

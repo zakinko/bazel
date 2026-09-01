@@ -1,0 +1,11 @@
+diff -u -r a/BUILD.bazel b/BUILD.bazel
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -5,6 +5,7 @@
+     name = "copy_link_jni_md_header",
+     srcs = select({
+         "@bazel_tools//src/conditions:darwin": ["@bazel_tools//tools/jdk:jni_md_header-darwin"],
++        "@bazel_tools//src/conditions:dragonfly": ["@bazel_tools//tools/jdk:jni_md_header-dragonfly"],
+         "@bazel_tools//src/conditions:freebsd": ["@bazel_tools//tools/jdk:jni_md_header-freebsd"],
+         "@bazel_tools//src/conditions:netbsd": ["@bazel_tools//tools/jdk:jni_md_header-netbsd"],
+         "@bazel_tools//src/conditions:openbsd": ["@bazel_tools//tools/jdk:jni_md_header-openbsd"],
