@@ -15,6 +15,8 @@
 #if defined(__FreeBSD__)
 # define HAVE_PROCSTAT
 # define STANDARD_JAVABASE "/usr/local/openjdk8"
+#elif defined(__DragonFly__)
+# define STANDARD_JAVABASE "/usr/local/openjdk21"
 #elif defined(__NetBSD__)
 # define STANDARD_JAVABASE "/usr/pkg/java/openjdk21"
 #elif defined(__OpenBSD__)
@@ -126,6 +128,15 @@ string GetSelfPath(const char* argv0) {
     procstat_freeprocs(procstat, p);
   }
   procstat_close(procstat);
+  return string(buffer);
+#elif defined(__DragonFly__)
+  // No libprocstat here, but the kernel answers the same question directly.
+  char buffer[PATH_MAX] = {};
+  int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1};
+  size_t len = sizeof(buffer);
+  if (sysctl(mib, 4, buffer, &len, nullptr, 0) < 0) {
+    return "";
+  }
   return string(buffer);
 #elif defined(__OpenBSD__) || defined(__NetBSD__)
   // OpenBSD does not provide a way for a running process to find a path to its

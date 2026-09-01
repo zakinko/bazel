@@ -5,6 +5,7 @@ genrule(
     name = "copy_link_jni_md_header",
     srcs = select({
         "//src/conditions:darwin": ["@rules_java//toolchains:jni_md_header-darwin"],
+        "//src/conditions:dragonfly": ["@rules_java//toolchains:jni_md_header-dragonfly"],
         "//src/conditions:freebsd": ["@rules_java//toolchains:jni_md_header-freebsd"],
         "//src/conditions:netbsd": ["@rules_java//toolchains:jni_md_header-netbsd"],
         "//src/conditions:openbsd": ["@rules_java//toolchains:jni_md_header-openbsd"],
@@ -41,6 +42,7 @@ filegroup(
             "darwin/util.cc",
             "darwin/util.h",
         ],
+        "//src/conditions:dragonfly": ["unix_jni_bsd.cc"],
         "//src/conditions:freebsd": ["unix_jni_bsd.cc"],
         "//src/conditions:netbsd": ["unix_jni_bsd.cc"],
         "//src/conditions:openbsd": ["unix_jni_bsd.cc"],

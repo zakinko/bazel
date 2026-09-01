@@ -520,6 +520,7 @@ UNNECESSARY_DYNAMIC_LIBRARIES = select({
     "//src/conditions:linux_aarch64": "*.so *.jnilib *.dll *.pyd",
     "//src/conditions:linux_ppc": "*.so *.jnilib *.dll *.pyd",
     "//src/conditions:freebsd": "*.so *.jnilib *.dll *.pyd",
+    "//src/conditions:dragonfly": "*.so *.jnilib *.dll *.pyd",
     "//src/conditions:netbsd": "*.so *.jnilib *.dll *.pyd",
     "//src/conditions:openbsd": "*.so *.jnilib *.dll *.pyd",
     # Default is to play it safe -- better have a big binary than a slow binary

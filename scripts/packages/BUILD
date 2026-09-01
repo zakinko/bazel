@@ -24,6 +24,7 @@ filegroup(
             ":zip-bazel-exe_nojdk",
         ],
         "//src/conditions:freebsd": [],
+        "//src/conditions:dragonfly": [],
         "//src/conditions:netbsd": [],
         "//src/conditions:openbsd": [],
         "//src/conditions:darwin": [

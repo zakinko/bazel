@@ -45,8 +45,12 @@ if [[ -f "${JAR_FILE}" ]]; then
   # Extract options from manifest:
   # We first join continuation lines in the manifest, then grep for the headers we
   # care about, and then process them.
+  # tr, not sed: OpenBSD's sed does not take \r as a carriage return in the
+  # left hand side, so 's/\r$//' quietly deletes a trailing letter r instead
+  # and every value keeps its CR.  The header then holds a bare CR inside a
+  # string literal, which clang reads as the end of the line.
   unzip -p "${JAR_FILE}" META-INF/MANIFEST.MF 2>/dev/null | \
-      sed -e 's/\r$//' | sed -e ':a' -e 'N' -e '$!ba' -e 's/\n / /g' | \
+      tr -d '\r' | sed -e ':a' -e 'N' -e '$!ba' -e 's/\n / /g' | \
       grep -E '^(Add-Exports|Add-Opens):' | \
       while read -r line; do
           if [[ "$line" =~ ^Add-Exports: ]]; then

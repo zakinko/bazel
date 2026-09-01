@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(__DragonFly__)
 # define HAVE_EXTATTR
 # define HAVE_SYSCTLBYNAME
 #elif defined(__NetBSD__)

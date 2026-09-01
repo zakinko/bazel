@@ -69,6 +69,7 @@ cc_binary(
     srcs = select({
         "//src/conditions:darwin": ["dummy-sandbox.c"],
         "//src/conditions:freebsd": ["dummy-sandbox.c"],
+        "//src/conditions:dragonfly": ["dummy-sandbox.c"],
         "//src/conditions:netbsd": ["dummy-sandbox.c"],
         "//src/conditions:openbsd": ["dummy-sandbox.c"],
         "//src/conditions:windows": ["dummy-sandbox.c"],
@@ -84,6 +85,7 @@ cc_binary(
     linkopts = select({
         "//src/conditions:darwin": [],
         "//src/conditions:freebsd": [],
+        "//src/conditions:dragonfly": [],
         "//src/conditions:netbsd": [],
         "//src/conditions:openbsd": [],
         "//src/conditions:windows": [],
@@ -95,6 +97,7 @@ cc_binary(
     deps = select({
         "//src/conditions:darwin": [],
         "//src/conditions:freebsd": [],
+        "//src/conditions:dragonfly": [],
         "//src/conditions:netbsd": [],
         "//src/conditions:openbsd": [],
         "//src/conditions:windows": [],
