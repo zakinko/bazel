@@ -8,6 +8,7 @@ on:
       - 'ci/v6only-probe.c'
       - 'ci/peer-probe.c'
       - 'ci/abseil-facts.sh'
+      - 'ci/bsd-facts.sh'
       - '.github/workflows/v6only-probe.yml'
   workflow_dispatch:
 
@@ -36,6 +37,8 @@ jobs:
             cc -O2 -Wall -o /tmp/q ci/peer-probe.c && /tmp/q
             echo "--- abseil が前提にしている事実 ---"
             sh ci/abseil-facts.sh
+            echo "--- BSD ごとの事実 ---"
+            sh ci/bsd-facts.sh
 
   freebsd:
     name: FreeBSD amd64
@@ -56,6 +59,8 @@ jobs:
             cc -O2 -Wall -o /tmp/q ci/peer-probe.c && /tmp/q
             echo "--- abseil が前提にしている事実 ---"
             sh ci/abseil-facts.sh
+            echo "--- BSD ごとの事実 ---"
+            sh ci/bsd-facts.sh
 
   openbsd:
     name: OpenBSD amd64
@@ -76,6 +81,8 @@ jobs:
             cc -O2 -Wall -o /tmp/q ci/peer-probe.c && /tmp/q
             echo "--- abseil が前提にしている事実 ---"
             sh ci/abseil-facts.sh
+            echo "--- BSD ごとの事実 ---"
+            sh ci/bsd-facts.sh
 
   dragonfly:
     name: DragonFly BSD
@@ -96,3 +103,5 @@ jobs:
             cc -O2 -Wall -o /tmp/q ci/peer-probe.c && /tmp/q
             echo "--- abseil が前提にしている事実 ---"
             sh ci/abseil-facts.sh
+            echo "--- BSD ごとの事実 ---"
+            sh ci/bsd-facts.sh
