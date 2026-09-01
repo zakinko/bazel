@@ -51,6 +51,19 @@ else
 	say "(pid_t)pthread_self()" "通らない"
 fi
 
+# 2b. abseil が実際に書いている形は C++ の static_cast である。C の cast は
+#     pointer から整数へも通ってしまうので、C で測ると答えを間違える。
+cat > "$T/b2.cc" <<'C'
+#include <pthread.h>
+#include <sys/types.h>
+pid_t f() { return static_cast<pid_t>(pthread_self()); }
+C
+if c++ -std=gnu++17 -c -o "$T/b2.o" "$T/b2.cc" 2>"$T/b2.err"; then
+	say "static_cast<pid_t>(pthread_self())" "通る"
+else
+	say "static_cast<pid_t>(pthread_self())" "通らない"
+fi
+
 # 3. その platform が持つ thread id の取り方。
 for fn in pthread_getthreadid_np _lwp_self pthread_threadid_np; do
 	cat > "$T/c.c" <<C
