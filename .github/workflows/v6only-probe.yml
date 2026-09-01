@@ -27,6 +27,8 @@ jobs:
           run: |
             uname -sr
             sysctl net.inet6.ip6.v6only || echo "sysctl: no such oid"
+            echo "--- lo0 ---"; ifconfig lo0 2>&1 | head -8
+            echo "--- v6 route ---"; netstat -rn -f inet6 2>&1 | head -6
             cc -o /tmp/p ci/v6only-probe.c && /tmp/p
 
   freebsd:
@@ -41,6 +43,8 @@ jobs:
           run: |
             uname -sr
             sysctl net.inet6.ip6.v6only || echo "sysctl: no such oid"
+            echo "--- lo0 ---"; ifconfig lo0 2>&1 | head -8
+            echo "--- v6 route ---"; netstat -rn -f inet6 2>&1 | head -6
             cc -o /tmp/p ci/v6only-probe.c && /tmp/p
 
   openbsd:
@@ -55,6 +59,8 @@ jobs:
           run: |
             uname -sr
             sysctl net.inet6.ip6.v6only || echo "sysctl: no such oid"
+            echo "--- lo0 ---"; ifconfig lo0 2>&1 | head -8
+            echo "--- v6 route ---"; netstat -rn -f inet6 2>&1 | head -6
             cc -o /tmp/p ci/v6only-probe.c && /tmp/p
 
   dragonfly:
@@ -69,4 +75,6 @@ jobs:
           run: |
             uname -sr
             sysctl net.inet6.ip6.v6only || echo "sysctl: no such oid"
+            echo "--- lo0 ---"; ifconfig lo0 2>&1 | head -8
+            echo "--- v6 route ---"; netstat -rn -f inet6 2>&1 | head -6
             cc -o /tmp/p ci/v6only-probe.c && /tmp/p
