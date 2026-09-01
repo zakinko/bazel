@@ -48,7 +48,7 @@ jobs:
                 patches = ["//toolchain_local:rules_cc_859.patch"],
             )
             M
-            $B build //src:bazel --tool_java_runtime_version=local_jdk --java_language_version=25 --tool_java_language_version=25 --jobs=2 2>&1 | tail -25
+            $B build //src:bazel --tool_java_runtime_version=local_jdk --java_language_version=25 --tool_java_language_version=25 --jobs=2
 
   ghostbsd:
     name: GhostBSD (master)
@@ -82,7 +82,7 @@ jobs:
                 patches = ["//toolchain_local:rules_cc_859.patch"],
             )
             M
-            $B build //src:bazel --tool_java_runtime_version=local_jdk --java_language_version=25 --tool_java_language_version=25 --jobs=2 2>&1 | tail -25
+            $B build //src:bazel --tool_java_runtime_version=local_jdk --java_language_version=25 --tool_java_language_version=25 --jobs=2
 
   netbsd:
     name: NetBSD (master)
@@ -125,7 +125,7 @@ jobs:
                 patches = ["//toolchain_local:rules_cc_859.patch"],
             )
             M
-            $B build //src:bazel --tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2 2>&1 | tail -25
+            $B build //src:bazel --tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2
 
   openbsd:
     name: OpenBSD (master)
@@ -161,7 +161,7 @@ jobs:
                 patches = ["//toolchain_local:rules_cc_859.patch"],
             )
             M
-            $B build //src:bazel --tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2 2>&1 | tail -25
+            $B build //src:bazel --tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2
 
   dragonfly:
     name: DragonFly (master)
@@ -197,4 +197,4 @@ jobs:
                 patches = ["//toolchain_local:rules_cc_859.patch"],
             )
             M
-            $B build //src:bazel --tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2 2>&1 | tail -25
+            $B build //src:bazel --tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2
