@@ -31,6 +31,7 @@ jobs:
           run: |
             export JAVA_HOME=/usr/local/openjdk21
             export PATH=$JAVA_HOME/bin:/usr/local/bin:$PATH
+            export SRCDIR=$(pwd)
             export PLAIN=1
             export EXTRA_BAZEL_ARGS="--tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2"
             sh ci/bsd-bootstrap.sh
@@ -52,6 +53,7 @@ jobs:
           run: |
             export JAVA_HOME=/usr/local/jdk-21
             export PATH=$JAVA_HOME/bin:/usr/local/bin:$PATH
+            export SRCDIR=$(pwd)
             export PLAIN=1
             export EXTRA_BAZEL_ARGS="--tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2"
             sh ci/bsd-bootstrap.sh
