@@ -1,0 +1,72 @@
+# grpc の dualstack 判定が各 BSD で正しいかを測る。上流へ出す文の根拠を
+# 自分で取るためのもので、bazel は建てない。boot と cc だけ。
+name: v6only probe
+
+on:
+  push:
+    paths:
+      - 'ci/v6only-probe.c'
+      - '.github/workflows/v6only-probe.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  netbsd:
+    name: NetBSD amd64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: vmactions/netbsd-vm@6334c835de4c04a59fe59f0f8f071e02a2f0bab3 # v1
+        with:
+          release: "11.0"
+          usesh: true
+          copyback: false
+          run: |
+            uname -sr
+            sysctl net.inet6.ip6.v6only || echo "sysctl: no such oid"
+            cc -o /tmp/p ci/v6only-probe.c && /tmp/p
+
+  freebsd:
+    name: FreeBSD amd64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: vmactions/freebsd-vm@f0552d3b69211736abd97f02ff3d4674c56b73b1 # v1
+        with:
+          usesh: true
+          copyback: false
+          run: |
+            uname -sr
+            sysctl net.inet6.ip6.v6only || echo "sysctl: no such oid"
+            cc -o /tmp/p ci/v6only-probe.c && /tmp/p
+
+  openbsd:
+    name: OpenBSD amd64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: vmactions/openbsd-vm@86cdc08415d9d0865267e686561e276c52d62530 # v1
+        with:
+          usesh: true
+          copyback: false
+          run: |
+            uname -sr
+            sysctl net.inet6.ip6.v6only || echo "sysctl: no such oid"
+            cc -o /tmp/p ci/v6only-probe.c && /tmp/p
+
+  dragonfly:
+    name: DragonFly BSD
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: vmactions/dragonflybsd-vm@7cd7c9b7f2b06e8e03d2337a9476995f3c112acf # v1
+        with:
+          usesh: true
+          copyback: false
+          run: |
+            uname -sr
+            sysctl net.inet6.ip6.v6only || echo "sysctl: no such oid"
+            cc -o /tmp/p ci/v6only-probe.c && /tmp/p
