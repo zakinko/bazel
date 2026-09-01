@@ -32,7 +32,7 @@ jobs:
             sh ci/setup-freebsd.sh
             . /etc/profile
             echo "JAVA_HOME=$JAVA_HOME"
-            command -v bash unzip python3 gmake
+            for t in bash unzip python3 gmake javac; do command -v $t; done
             cd /root
             fetch -o dist.zip https://github.com/bazelbuild/bazel/releases/download/9.2.0/bazel-9.2.0-dist.zip
             mkdir -p b && cd b && unzip -q -o ../dist.zip
