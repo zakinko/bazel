@@ -1,0 +1,18 @@
+diff -u -r a/src/main/cpp/generate_jvm_module_options.sh b/src/main/cpp/generate_jvm_module_options.sh
+--- a/src/main/cpp/generate_jvm_module_options.sh
++++ b/src/main/cpp/generate_jvm_module_options.sh
+@@ -1,4 +1,4 @@
+-#!/bin/bash
++#!/usr/bin/env bash
+ #
+ # Copyright 2025 The Bazel Authors. All rights reserved.
+ #
+@@ -46,7 +46,7 @@
+   # We first join continuation lines in the manifest, then grep for the headers we
+   # care about, and then process them.
+   unzip -p "${JAR_FILE}" META-INF/MANIFEST.MF 2>/dev/null | \
+-      sed -e 's/\r$//' | sed -e ':a' -e 'N' -e '$!ba' -e 's/\n / /g' | \
++      tr -d '\r' | sed -e ':a' -e 'N' -e '$!ba' -e 's/\n / /g' | \
+       grep -E '^(Add-Exports|Add-Opens):' | \
+       while read -r line; do
+           if [[ "$line" =~ ^Add-Exports: ]]; then

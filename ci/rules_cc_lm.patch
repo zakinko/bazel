@@ -1,0 +1,14 @@
+diff -u -r a/cc/private/toolchain/bsd_cc_toolchain_config.bzl b/cc/private/toolchain/bsd_cc_toolchain_config.bzl
+--- a/cc/private/toolchain/bsd_cc_toolchain_config.bzl
++++ b/cc/private/toolchain/bsd_cc_toolchain_config.bzl
+@@ -84,6 +84,10 @@
+                     flag_group(
+                         flags = [
+                             "-lc++",
++                            # libc++'s unordered containers call ceilf when
++                            # they rehash, and the BSDs keep the C99 float
++                            # math in libm rather than libc.
++                            "-lm",
+                             "-Wl,-z,relro,-z,now",
+                             "-no-canonical-prefixes",
+                         ],
