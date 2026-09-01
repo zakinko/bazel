@@ -1,0 +1,120 @@
+# buildkite/setup-<os>.sh に出せる形の script を、きれいな機械で走らせて
+# 確かめる。script だけで機械を仕度し、そのあと素の 9.2.0 を建てる。
+# master には dist archive が無く、compile.sh は PROTOC と
+# GRPC_JAVA_PLUGIN を要るので、踏み台なしで建てられるのは release だけ。
+name: setup check
+
+on:
+  push:
+    paths:
+      - 'ci/setup-*.sh'
+      - '.github/workflows/setup-check.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  openbsd:
+    name: OpenBSD
+    runs-on: ubuntu-latest
+    steps:
+      - name: Make room on the runner
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: vmactions/openbsd-vm@86cdc08415d9d0865267e686561e276c52d62530 # v1
+        with:
+          usesh: true
+          mem: 8192
+          copyback: false
+          run: |
+            sh ci/setup-openbsd.sh
+            . /etc/profile
+            ulimit -n 4096
+            for t in bash unzip python3 gmake javac; do command -v $t; done
+            cd /home && rm -rf b && mkdir b && cd b
+            ftp -o dist.zip https://github.com/bazelbuild/bazel/releases/download/9.2.0/bazel-9.2.0-dist.zip
+            unzip -q -o dist.zip && rm -f dist.zip
+            mkdir -p toolchain_local && cp "$GITHUB_WORKSPACE/ci/rules_cc_859.patch" toolchain_local/
+            : > toolchain_local/BUILD
+            cat >> MODULE.bazel <<'M'
+
+            single_version_override(
+                module_name = "rules_cc",
+                patch_strip = 1,
+                patches = ["//toolchain_local:rules_cc_859.patch"],
+            )
+            M
+            export TMPDIR=/home/b/tmp && mkdir -p $TMPDIR
+            export EXTRA_BAZEL_ARGS="--tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2"
+            bash ./compile.sh
+            ./output/bazel --version
+
+  netbsd:
+    name: NetBSD
+    runs-on: ubuntu-latest
+    steps:
+      - name: Make room on the runner
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: vmactions/netbsd-vm@6334c835de4c04a59fe59f0f8f071e02a2f0bab3 # v1
+        with:
+          release: "11.0"
+          usesh: true
+          mem: 8192
+          copyback: false
+          run: |
+            sh ci/setup-netbsd.sh
+            . /etc/profile
+            for t in bash unzip python3 gmake javac; do command -v $t; done
+            cd /root && rm -rf b && mkdir b && cd b
+            ftp -o dist.zip https://github.com/bazelbuild/bazel/releases/download/9.2.0/bazel-9.2.0-dist.zip
+            unzip -q -o dist.zip && rm -f dist.zip
+            mkdir -p toolchain_local && cp "$GITHUB_WORKSPACE/ci/rules_cc_859.patch" toolchain_local/
+            : > toolchain_local/BUILD
+            cat >> MODULE.bazel <<'M'
+
+            single_version_override(
+                module_name = "rules_cc",
+                patch_strip = 1,
+                patches = ["//toolchain_local:rules_cc_859.patch"],
+            )
+            M
+            export EXTRA_BAZEL_ARGS="--tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2"
+            bash ./compile.sh
+            ./output/bazel --version
+
+  dragonfly:
+    name: DragonFly BSD
+    runs-on: ubuntu-latest
+    steps:
+      - name: Make room on the runner
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: vmactions/dragonflybsd-vm@7cd7c9b7f2b06e8e03d2337a9476995f3c112acf # v1
+        with:
+          usesh: true
+          mem: 8192
+          copyback: false
+          run: |
+            sh ci/setup-dragonflybsd.sh
+            . /etc/profile
+            for t in bash unzip python3 gmake javac; do command -v $t; done
+            echo "CC=$CC CXX=$CXX"
+            cd /root && rm -rf b && mkdir b && cd b
+            fetch -o dist.zip https://github.com/bazelbuild/bazel/releases/download/9.2.0/bazel-9.2.0-dist.zip
+            unzip -q -o dist.zip && rm -f dist.zip
+            mkdir -p toolchain_local && cp "$GITHUB_WORKSPACE/ci/rules_cc_859.patch" toolchain_local/
+            : > toolchain_local/BUILD
+            cat >> MODULE.bazel <<'M'
+
+            single_version_override(
+                module_name = "rules_cc",
+                patch_strip = 1,
+                patches = ["//toolchain_local:rules_cc_859.patch"],
+            )
+            M
+            export EXTRA_BAZEL_ARGS="--tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2"
+            bash ./compile.sh
+            ./output/bazel --version
