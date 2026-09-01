@@ -1,0 +1,85 @@
+# bazel の master が BSD で建つかを測る。9.2.0 ではなく master を見る。
+# master は git 木なので compile.sh が使えない (PROTOC を要る)。package の
+# bazel9 を踏み台にして //src:bazel を建てる。
+name: master on BSD
+
+on:
+  push:
+    paths:
+      - '.github/workflows/master-bsd.yml'
+      - 'ci/rules_cc_859.patch'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  freebsd:
+    name: FreeBSD (master)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Make room on the runner
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: vmactions/freebsd-vm@f0552d3b69211736abd97f02ff3d4674c56b73b1 # v1
+        with:
+          usesh: true
+          mem: 8192
+          copyback: false
+          prepare: |
+            mount -t procfs proc /proc || true
+            pkg install -y bazel9 openjdk25 python3 zip unzip bash git wget gmake
+          run: |
+            export JAVA_HOME=/usr/local/openjdk25
+            export PATH=$JAVA_HOME/bin:/usr/local/bin:$PATH
+            command -v bazel bazel9 || true
+            B=$(command -v bazel9 || command -v bazel)
+            $B --version || true
+            cd /root && rm -rf mst && git clone -q --depth 1 https://github.com/bazelbuild/bazel.git mst
+            cd mst && git log --oneline -1
+            mkdir -p toolchain_local && cp "$GITHUB_WORKSPACE/ci/rules_cc_859.patch" toolchain_local/
+            : > toolchain_local/BUILD
+            cat >> MODULE.bazel <<'M'
+
+            single_version_override(
+                module_name = "rules_cc",
+                patch_strip = 1,
+                patches = ["//toolchain_local:rules_cc_859.patch"],
+            )
+            M
+            $B build //src:bazel --tool_java_runtime_version=local_jdk --java_language_version=25 --tool_java_language_version=25 --jobs=2 2>&1 | tail -25
+
+  ghostbsd:
+    name: GhostBSD (master)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Make room on the runner
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: vmactions/ghostbsd-vm@4695f191a42fd12ec60a375adde35275c01d6b8e # v1.0.3
+        with:
+          usesh: true
+          mem: 8192
+          copyback: false
+          prepare: |
+            mount -t procfs proc /proc || true
+            pkg install -y bazel9 openjdk25 python3 zip unzip bash git wget gmake
+          run: |
+            export JAVA_HOME=/usr/local/openjdk25
+            export PATH=$JAVA_HOME/bin:/usr/local/bin:$PATH
+            B=$(command -v bazel9 || command -v bazel)
+            $B --version || true
+            cd /root && rm -rf mst && git clone -q --depth 1 https://github.com/bazelbuild/bazel.git mst
+            cd mst && git log --oneline -1
+            mkdir -p toolchain_local && cp "$GITHUB_WORKSPACE/ci/rules_cc_859.patch" toolchain_local/
+            : > toolchain_local/BUILD
+            cat >> MODULE.bazel <<'M'
+
+            single_version_override(
+                module_name = "rules_cc",
+                patch_strip = 1,
+                patches = ["//toolchain_local:rules_cc_859.patch"],
+            )
+            M
+            $B build //src:bazel --tool_java_runtime_version=local_jdk --java_language_version=25 --tool_java_language_version=25 --jobs=2 2>&1 | tail -25
