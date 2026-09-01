@@ -28,8 +28,10 @@ jobs:
             uname -sr
             sysctl net.inet6.ip6.v6only || echo "sysctl: no such oid"
             echo "--- lo0 ---"; ifconfig lo0 2>&1 | head -8
-            echo "--- v6 route ---"; netstat -rn -f inet6 2>&1 | head -6
+            echo "--- v6 route ---"; netstat -rn -f inet6 2>&1 | head -20
             cc -o /tmp/p ci/v6only-probe.c && /tmp/p
+            echo "--- peer の C をそのまま ---"
+            cc -O2 -Wall -o /tmp/q ci/peer-probe.c && /tmp/q
 
   freebsd:
     name: FreeBSD amd64
@@ -44,8 +46,10 @@ jobs:
             uname -sr
             sysctl net.inet6.ip6.v6only || echo "sysctl: no such oid"
             echo "--- lo0 ---"; ifconfig lo0 2>&1 | head -8
-            echo "--- v6 route ---"; netstat -rn -f inet6 2>&1 | head -6
+            echo "--- v6 route ---"; netstat -rn -f inet6 2>&1 | head -20
             cc -o /tmp/p ci/v6only-probe.c && /tmp/p
+            echo "--- peer の C をそのまま ---"
+            cc -O2 -Wall -o /tmp/q ci/peer-probe.c && /tmp/q
 
   openbsd:
     name: OpenBSD amd64
@@ -60,8 +64,10 @@ jobs:
             uname -sr
             sysctl net.inet6.ip6.v6only || echo "sysctl: no such oid"
             echo "--- lo0 ---"; ifconfig lo0 2>&1 | head -8
-            echo "--- v6 route ---"; netstat -rn -f inet6 2>&1 | head -6
+            echo "--- v6 route ---"; netstat -rn -f inet6 2>&1 | head -20
             cc -o /tmp/p ci/v6only-probe.c && /tmp/p
+            echo "--- peer の C をそのまま ---"
+            cc -O2 -Wall -o /tmp/q ci/peer-probe.c && /tmp/q
 
   dragonfly:
     name: DragonFly BSD
@@ -76,5 +82,7 @@ jobs:
             uname -sr
             sysctl net.inet6.ip6.v6only || echo "sysctl: no such oid"
             echo "--- lo0 ---"; ifconfig lo0 2>&1 | head -8
-            echo "--- v6 route ---"; netstat -rn -f inet6 2>&1 | head -6
+            echo "--- v6 route ---"; netstat -rn -f inet6 2>&1 | head -20
             cc -o /tmp/p ci/v6only-probe.c && /tmp/p
+            echo "--- peer の C をそのまま ---"
+            cc -O2 -Wall -o /tmp/q ci/peer-probe.c && /tmp/q
