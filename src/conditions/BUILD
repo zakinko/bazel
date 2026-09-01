@@ -160,6 +160,12 @@ config_setting(
 )
 
 config_setting(
+    name = "dragonfly",
+    constraint_values = ["@platforms//os:dragonfly"],
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
     name = "netbsd",
     constraint_values = ["@platforms//os:netbsd"],
     visibility = ["//visibility:public"],

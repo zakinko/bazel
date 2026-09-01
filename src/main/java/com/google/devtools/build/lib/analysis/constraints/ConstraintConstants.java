@@ -56,6 +56,10 @@ public final class ConstraintConstants {
           OS.WINDOWS,
           ConstraintValueInfo.create(
               OS_CONSTRAINT_SETTING,
+              Label.parseCanonicalUnchecked("@platforms//os:dragonfly")),
+          OS.DRAGONFLY,
+          ConstraintValueInfo.create(
+              OS_CONSTRAINT_SETTING,
               Label.parseCanonicalUnchecked("@platforms//os:freebsd")),
           OS.FREEBSD,
           ConstraintValueInfo.create(

@@ -20,6 +20,7 @@ import java.util.EnumSet;
  */
 public enum OS {
   DARWIN("osx", "Mac OS X"),
+  DRAGONFLY("dragonfly", "DragonFly"),
   FREEBSD("freebsd", "FreeBSD"),
   NETBSD("netbsd", "NetBSD"),
   OPENBSD("openbsd", "OpenBSD"),
@@ -27,7 +28,7 @@ public enum OS {
   WINDOWS("windows", "Windows"),
   UNKNOWN("unknown", "");
 
-  private static final EnumSet<OS> POSIX_COMPATIBLE = EnumSet.of(DARWIN, FREEBSD, NETBSD, OPENBSD, LINUX);
+  private static final EnumSet<OS> POSIX_COMPATIBLE = EnumSet.of(DARWIN, DRAGONFLY, FREEBSD, NETBSD, OPENBSD, LINUX);
 
   private final String canonicalName;
   private final String detectionName;

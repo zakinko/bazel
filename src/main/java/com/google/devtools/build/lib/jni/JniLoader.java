@@ -38,6 +38,7 @@ public final class JniLoader {
     try {
       switch (OS.getCurrent()) {
         case LINUX:
+        case DRAGONFLY:
         case FREEBSD:
         case NETBSD:
         case OPENBSD:
