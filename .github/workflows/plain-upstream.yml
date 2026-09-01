@@ -32,6 +32,7 @@ jobs:
             export JAVA_HOME=/usr/local/openjdk21
             export PATH=$JAVA_HOME/bin:/usr/local/bin:$PATH
             export SRCDIR=$(pwd)
+            export PATCH859="$(pwd)/ci/rules_cc_859.patch"
             export PLAIN=1
             export EXTRA_BAZEL_ARGS="--tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2"
             sh ci/bsd-bootstrap.sh
@@ -54,6 +55,7 @@ jobs:
             export JAVA_HOME=/usr/local/jdk-21
             export PATH=$JAVA_HOME/bin:/usr/local/bin:$PATH
             export SRCDIR=$(pwd)
+            export PATCH859="$(pwd)/ci/rules_cc_859.patch"
             export PLAIN=1
             export EXTRA_BAZEL_ARGS="--tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2"
             sh ci/bsd-bootstrap.sh
@@ -72,16 +74,21 @@ jobs:
           mem: 8192
           copyback: false
           prepare: |
-            PKG_PATH=https://ftp.jaist.ac.jp/pub/pkgsrc/packages/NetBSD/$(uname -p)/$(uname -r)/All
-            export PKG_PATH
+            set -e
+            # cdn の openjdk21 は X11 の共有ライブラリに依存している。VM には
+            # X の set が入っていないので、先に xbase だけ展開しておく。
+            SET=$(uname -m)
+            [ "$SET" = evbarm ] && SET="evbarm-$(uname -p)"
+            ftp -o /tmp/xbase.tar.xz "https://cdn.NetBSD.org/pub/NetBSD/NetBSD-11.0/$SET/binary/sets/xbase.tar.xz"
+            tar -C / -xf /tmp/xbase.tar.xz
             /usr/sbin/pkg_add -U pkgin
-            echo "$PKG_PATH" > /usr/pkg/etc/pkgin/repositories.conf
-            pkgin -y update
-            pkgin -y install openjdk21 python311 unzip zip bash git wget gmake
+            pkgin -y install openjdk21 bash zip unzip python313 go126 curl
+            test -x /usr/pkg/java/openjdk21/bin/javac
           run: |
             export JAVA_HOME=/usr/pkg/java/openjdk21
             export PATH=$JAVA_HOME/bin:/usr/pkg/bin:$PATH
             export SRCDIR=$(pwd)
+            export PATCH859="$(pwd)/ci/rules_cc_859.patch"
             export PLAIN=1
             export EXTRA_BAZEL_ARGS="--tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2"
             sh ci/bsd-bootstrap.sh
@@ -105,6 +112,7 @@ jobs:
             export JAVA_HOME=/usr/local/openjdk21
             export PATH=$JAVA_HOME/bin:/usr/local/bin:$PATH
             export SRCDIR=$(pwd)
+            export PATCH859="$(pwd)/ci/rules_cc_859.patch"
             export PLAIN=1
             export EXTRA_BAZEL_ARGS="--tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2"
             sh ci/bsd-bootstrap.sh

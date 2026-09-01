@@ -1,0 +1,25 @@
+diff -u -r a/cc/private/toolchain/bsd_cc_toolchain_config.bzl b/cc/private/toolchain/bsd_cc_toolchain_config.bzl
+--- a/cc/private/toolchain/bsd_cc_toolchain_config.bzl
++++ b/cc/private/toolchain/bsd_cc_toolchain_config.bzl
+@@ -73,6 +73,9 @@ def _impl(ctx):
+     )
+ 
+     action_configs = [objcopy_embed_data_action] if is_bsd else []
++    extra_default_link_flags = []
++    if cpu == "openbsd":
++        extra_default_link_flags = ["-lc++abi", "-lpthread"]
+ 
+     default_link_flags_feature = feature(
+         name = "default_link_flags",
+@@ -84,9 +87,10 @@ def _impl(ctx):
+                     flag_group(
+                         flags = [
+                             "-lc++",
++                            "-lm",
+                             "-Wl,-z,relro,-z,now",
+                             "-no-canonical-prefixes",
+-                        ],
++                        ] + extra_default_link_flags,
+                     ),
+                 ],
+             ),

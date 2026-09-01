@@ -182,6 +182,21 @@ echo "=== この枝の変更を被せる"
 if [ -n "$PLAIN" ]; then
 	echo "PLAIN=1 なので被せない。素の $DIST_URL を建てる"
 	cd "$WORK"
+	# rules_cc の当て物だけを当てる。PR 859 の形をそのまま使う。
+	if [ -n "$PATCH859" ]; then
+		mkdir -p toolchain_local
+		cp "$PATCH859" toolchain_local/rules_cc_859.patch
+		: > toolchain_local/BUILD
+		cat >> MODULE.bazel <<'PATCHEOF'
+
+single_version_override(
+    module_name = "rules_cc",
+    patch_strip = 1,
+    patches = ["//toolchain_local:rules_cc_859.patch"],
+)
+PATCHEOF
+		echo "859 の当て物を入れた"
+	fi
 	"${BAZEL_SH:-bash}" ./compile.sh
 	./output/bazel --version
 	exit $?
