@@ -106,10 +106,24 @@ FLAGS="$FLAGS --action_env=PATH=$PATH --host_action_env=PATH=$PATH"
 ulimit -n unlimited 2>/dev/null || ulimit -n 4096 2>/dev/null || true
 ulimit -d unlimited 2>/dev/null || true
 
+# //src:bazel は JDK を binary に埋め込む。埋め込む JDK は remote JDK の
+# 書庫から来るので BSD 向けが無く、Linux の jlink を走らせようとして
+#
+#	src/BUILD:244:8: Executing genrule //src:embedded_jdk_minimal failed
+#	minimize_jdk: line 167: ../tool_jdk.4338/bin/jlink:
+#	  cannot execute binary file: Exec format error
+#
+# になる。compile.sh がどの platform でも建てるのは bazel_nojdk の方で、
+# FreeBSD の devel/bazel9 が配っているのもそれである。
+TARGET=${TARGET:-//src:bazel_nojdk}
+
 echo "=== 建てる"
+echo "target: $TARGET"
 echo "flags: $FLAGS"
 # shellcheck disable=SC2086
-"$B" build //src:bazel $FLAGS --jobs=2
+"$B" build $TARGET $FLAGS --jobs=2
 
 echo "=== 動かす"
-./bazel-bin/src/bazel --version
+OUT=$("$B" cquery --output=files $TARGET $FLAGS 2>/dev/null | head -1)
+echo "できたもの: $OUT"
+"$OUT" --version

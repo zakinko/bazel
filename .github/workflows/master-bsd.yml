@@ -91,9 +91,15 @@ jobs:
             export PATH=$JAVA_HOME/bin:/usr/pkg/bin:$PATH
             export JAVA_VER=21
             export PATCH859="$GITHUB_WORKSPACE/ci/rules_cc_859.patch"
-            # pkgsrc に bazel が無いので 9.2.0 をすっぴんで建てて踏み台にする。
-            PLAIN=1 SRCDIR="$GITHUB_WORKSPACE" \
-              sh "$GITHUB_WORKSPACE/ci/bsd-bootstrap.sh"
+            # 踏み台の bazel が package から手に入らない。素の 9.2.0 も
+            # ここでは建たない (NetBSD は action の shell の /bin/bash、
+            # OpenBSD は generate_jvm_module_options.sh の shebang、
+            # DragonFly は rules_go の go/toolchain:dragonflybsd)。BSD 対応の
+            # 入った枝から 9.2.0 を建てて踏み台にする。踏み台は測るものでは
+            # なく道具なので、当て物の入ったもので構わない。
+            cd /root && rm -rf boot && git clone -q --depth 1 \
+              -b netbsd-ci https://github.com/zakinko/bazel.git boot
+            SRCDIR=/root/boot sh /root/boot/ci/bsd-bootstrap.sh
             export B=$(cat /tmp/bootstrap-bazel-path)
             sh "$GITHUB_WORKSPACE/ci/master-build.sh"
 
@@ -116,10 +122,15 @@ jobs:
             export PATH=$JAVA_HOME/bin:/usr/local/bin:$PATH
             export JAVA_VER=21
             export PATCH859="$GITHUB_WORKSPACE/ci/rules_cc_859.patch"
-            # ports の bazel は 6.5.0 で master を建てられない。すっぴんの
-            # 9.2.0 を建てて踏み台にする。
-            PLAIN=1 SRCDIR="$GITHUB_WORKSPACE" \
-              sh "$GITHUB_WORKSPACE/ci/bsd-bootstrap.sh"
+            # 踏み台の bazel が package から手に入らない。素の 9.2.0 も
+            # ここでは建たない (NetBSD は action の shell の /bin/bash、
+            # OpenBSD は generate_jvm_module_options.sh の shebang、
+            # DragonFly は rules_go の go/toolchain:dragonflybsd)。BSD 対応の
+            # 入った枝から 9.2.0 を建てて踏み台にする。踏み台は測るものでは
+            # なく道具なので、当て物の入ったもので構わない。
+            cd /root && rm -rf boot && git clone -q --depth 1 \
+              -b netbsd-ci https://github.com/zakinko/bazel.git boot
+            SRCDIR=/root/boot sh /root/boot/ci/bsd-bootstrap.sh
             export B=$(cat /tmp/bootstrap-bazel-path)
             sh "$GITHUB_WORKSPACE/ci/master-build.sh"
 
@@ -143,8 +154,14 @@ jobs:
             export PATH=$JAVA_HOME/bin:/usr/local/bin:$PATH
             export JAVA_VER=21
             export PATCH859="$GITHUB_WORKSPACE/ci/rules_cc_859.patch"
-            # DragonFly には bazel の package が無い。
-            PLAIN=1 SRCDIR="$GITHUB_WORKSPACE" \
-              sh "$GITHUB_WORKSPACE/ci/bsd-bootstrap.sh"
+            # 踏み台の bazel が package から手に入らない。素の 9.2.0 も
+            # ここでは建たない (NetBSD は action の shell の /bin/bash、
+            # OpenBSD は generate_jvm_module_options.sh の shebang、
+            # DragonFly は rules_go の go/toolchain:dragonflybsd)。BSD 対応の
+            # 入った枝から 9.2.0 を建てて踏み台にする。踏み台は測るものでは
+            # なく道具なので、当て物の入ったもので構わない。
+            cd /root && rm -rf boot && git clone -q --depth 1 \
+              -b netbsd-ci https://github.com/zakinko/bazel.git boot
+            SRCDIR=/root/boot sh /root/boot/ci/bsd-bootstrap.sh
             export B=$(cat /tmp/bootstrap-bazel-path)
             sh "$GITHUB_WORKSPACE/ci/master-build.sh"

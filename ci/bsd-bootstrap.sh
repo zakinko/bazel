@@ -218,6 +218,10 @@ cd "$WORK"
 "${BAZEL_SH:-bash}" ./compile.sh
 ./output/bazel --version
 
+# 踏み台として使えるように在処を書き残す。作業場は空き容量で選ぶので
+# 呼ぶ側からは決め打ちできない。
+echo "$WORK/output/bazel" > ${BOOTSTRAP_OUT:-/tmp/bootstrap-bazel-path}
+
 # --version は client だけで答えられるので、建ったこと以上を意味しない。
 # DragonFly はここまで通ったうえで server に繋げず、どの build も 120 秒で
 # 諦めていた (grpc が IPv4-mapped アドレスを使うため)。server が上がって
