@@ -55,7 +55,7 @@ if [ "${PBMAJ:-0}" -lt 30 ]; then
 		ABSLALL=$(ls /usr/local/lib/libabsl_*.so 2>/dev/null |
 			sed 's|.*/libabsl_|-labsl_|; s|\.so$||' | tr '\n' ' ')
 		cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release \
-			-DCMAKE_EXE_LINKER_FLAGS="-L/usr/local/lib $ABSLALL" \
+			-DCMAKE_CXX_STANDARD_LIBRARIES="-L/usr/local/lib $ABSLALL" \
 			-DCMAKE_CXX_STANDARD=17 \
 			-Dprotobuf_BUILD_TESTS=OFF \
 			-Dprotobuf_BUILD_SHARED_LIBS=OFF \
