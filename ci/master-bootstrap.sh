@@ -320,6 +320,37 @@ echo "=== derived/jars の代わりを取る"
 PBV=$(python3 -c "import json;print(json.load(open('$SRC/maven_install.json'))['artifacts']['com.google.protobuf:protobuf-java']['version'])")
 ZSV=$(sed -n 's/.*name = "zstd-jni", version = "\([^"]*\)".*/\1/p' "$SRC/MODULE.bazel" | head -1 | sed 's/\.bcr\.[0-9]*$//')
 mkdir -p "$SRC/derived/maven/extra"
+
+# maven_install.json の io.grpc は 1.66.0 だが、plugin は HEAD しか使えない
+# (edition 2024 を宣言しているのは HEAD だけ)。HEAD が生成する stub は
+#
+#	ContentAddressableStorageGrpc.java:1467: error: cannot find symbol
+#	  io.grpc.stub.BlockingClientCall<?, ...>
+#
+# のように新しい API を呼ぶので、runtime も上げないと合わない。MODULE.bazel は
+# grpc-java 1.71.0 を指していて maven_install.json とそこもずれている。
+# release の最新に揃える。
+GRPCV=${GRPCV:-1.76.0}
+echo "  io.grpc を $GRPCV に揃える"
+find "$SRC/derived/maven" -path '*/io/grpc/*' -name '*.jar' -delete 2>/dev/null
+for a in grpc-api grpc-auth grpc-context grpc-core grpc-inprocess grpc-netty \
+	 grpc-protobuf grpc-protobuf-lite grpc-stub grpc-util; do
+	u="https://repo1.maven.org/maven2/io/grpc/$a/$GRPCV/$a-$GRPCV.jar"
+	[ -s "$SRC/derived/maven/extra/$a-$GRPCV.jar" ] ||
+		curl -sfL -o "$SRC/derived/maven/extra/$a-$GRPCV.jar" "$u" ||
+		echo "取れない: $u"
+done
+
+# async-profiler は maven に無い。repositories.bzl が http_file で GitHub の
+# release から取っている。同じものを取る。
+APU=$(sed -n 's|.*"\(https://github.com/async-profiler/[^"]*async-profiler.jar\)".*|\1|p' \
+	"$SRC/repositories.bzl" | head -1)
+if [ -n "$APU" ]; then
+	[ -s "$SRC/derived/maven/extra/async-profiler.jar" ] ||
+		curl -sfL -o "$SRC/derived/maven/extra/async-profiler.jar" "$APU" ||
+		echo "取れない: $APU"
+fi
+
 for u in \
   "https://repo1.maven.org/maven2/com/google/protobuf/protobuf-java-util/$PBV/protobuf-java-util-$PBV.jar" \
   "https://repo1.maven.org/maven2/com/github/luben/zstd-jni/$ZSV/zstd-jni-$ZSV.jar"; do
@@ -328,7 +359,7 @@ for u in \
 		curl -sfL -o "$SRC/derived/maven/extra/$f" "$u" ||
 		echo "取れない: $u"
 done
-ls -l "$SRC/derived/maven/extra"
+ls "$SRC/derived/maven/extra" | wc -l
 
 # compile.sh の PROTO_FILES は木からずれている。serialization/analysis/proto の
 # 下に proto が在るのに一覧へ入っていないので、そこから生成される Java が
@@ -351,26 +382,31 @@ if [ ! -f "$GAPI/devtools/build/v1/build_events.proto" ]; then
 	done
 fi
 
-# master の Java の source は二箇所だけ無名変数 (Java 22) を使っている。
+# master の Java の source は無名変数 (Java 22) を使っている箇所がある。
 #
-#	SelectedEntrySerializer.java:264   _ -> new AtomicInteger(0)
-#	DigestHashFunction.java:202        var _ = toCheck.clone();
+#	try (var _ = Profiler.instance().profile(...))
+#	_ -> new AtomicInteger(0)
 #
 #	error: unnamed variables are a preview feature and are disabled by default
 #
-# JDK 21 で建てるときはここだけが引っ掛かる。ほかは 21 で全部通る。
-# pkgsrc も DragonFly の dports も openjdk21 が最新なので、名前を付けて逃げる。
+# JDK 21 で建てるときはここだけが引っ掛かる。ほかは 21 で全部通る。pkgsrc も
+# DragonFly の dports も openjdk21 が最新なので、名前を付けて逃げる。
+# master は動くので file 名は決め打ちにせず、木を掃いて置き換える。
 if [ "$JAVA_VER" -lt 22 ]; then
 	echo "=== 無名変数を JDK $JAVA_VER 向けに直す"
-	sed -i.bak 's|_ -> new AtomicInteger(0))|unused -> new AtomicInteger(0))|' \
-		src/main/java/com/google/devtools/build/lib/skyframe/serialization/analysis/SelectedEntrySerializer.java
-	sed -i.bak 's|var _ = toCheck.clone();|var unused = toCheck.clone();|' \
-		src/main/java/com/google/devtools/build/lib/vfs/DigestHashFunction.java
-	grep -q "unused -> new AtomicInteger" \
-		src/main/java/com/google/devtools/build/lib/skyframe/serialization/analysis/SelectedEntrySerializer.java &&
-	grep -q "var unused = toCheck.clone" \
-		src/main/java/com/google/devtools/build/lib/vfs/DigestHashFunction.java ||
-		{ echo "無名変数の書き換えが当たっていない"; exit 1; }
+	n=0
+	for f in $(grep -rl -E 'var _ =|_ ->|\(_\)' src/main/java --include='*.java' 2>/dev/null); do
+		sed -i.bak -e 's|var _ =|var unused_ =|g' \
+			   -e 's|(_ ->|(unused_ ->|g' \
+			   -e 's|, _ ->|, unused_ ->|g' "$f"
+		rm -f "$f.bak"
+		n=$((n+1))
+	done
+	echo "  $n file を直した"
+	if grep -rq -E 'var _ =|\(_ ->' src/main/java --include='*.java' 2>/dev/null; then
+		echo "  まだ残っている:"
+		grep -rn -E 'var _ =|\(_ ->' src/main/java --include='*.java' | head -5
+	fi
 fi
 
 echo "=== 起こす"
