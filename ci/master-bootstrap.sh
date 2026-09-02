@@ -190,6 +190,36 @@ if [ ! -f "$GAPI/rpc/status.proto" ]; then
 	ls -R "$GAPI" | head -20
 fi
 
+# src/main/protobuf/project/*.proto が Google 内部の proto を import している。
+#
+#	import "devtools/starlark/protolark/proto/protolark.proto";
+#	string name = 1 [(.protolark.used_in_blaze) = true];
+#
+# その file は木に無く、公開もされていない。compile.sh の PROTO_FILES は
+# src/main/protobuf を find するので必ず当たり、protoc がそこで落ちる。
+# 9.2.0 の木にも同じ形で入っているので、git から起こす道は前から通らない。
+#
+# 使われているのは field への注記一つだけなので、同じ名前の extension を
+# 立てた stub を置けば protoc は通る。生成される Java は custom option を
+# 一つ余分に持つが、bazel はそれを読まない。番号は内部のものと合わない
+# はずだが、この木の中だけで閉じているので構わない。
+echo "=== protolark の stub を置く"
+PL=$SRC/third_party/remoteapis/devtools/starlark/protolark/proto
+mkdir -p "$PL"
+cat > "$PL/protolark.proto" <<'PROTOLARK'
+syntax = "proto2";
+
+package protolark;
+
+import "google/protobuf/descriptor.proto";
+
+// 上流の木には in-house の protolark.proto が無い。使われているのは
+// この注記だけなので、bootstrap を通すためだけの替え玉である。
+extend google.protobuf.FieldOptions {
+  optional bool used_in_blaze = 525000;
+}
+PROTOLARK
+
 echo "=== 起こす"
 PROTOC="$PROTOC" GRPC_JAVA_PLUGIN="$PLUGIN" "${BAZEL_SH:-bash}" ./compile.sh
 ./output/bazel --version
