@@ -113,18 +113,31 @@ if command -v go >/dev/null 2>&1; then
 	FLAGS="$FLAGS --repo_env=GOROOT=$(go env GOROOT)"
 fi
 
-# 落ちているのは C++ の方言ではなく modules である。bazel は layering_check の
-# ために module map を渡すが、その経由で libc++ の __locale が <ctype.h> を
-# 読むと、BSD 拡張の isascii が見えなくなる。
+# isascii が見えなくなるのは protobuf 自身の仕業である。
+#
+#	protobuf/src/google/protobuf/io/zero_copy_stream_impl.cc:13
+#	#define _POSIX_C_SOURCE 202405L
+#
+# これが立つと FreeBSD の sys/cdefs.h が __BSD_VISIBLE を 0 にし、ctype.h が
+# isascii を出さなくなる。同じ file が後から <istream> を読み、libc++ の
+# <locale> が isascii を使うので、そこで落ちる。
 #
 #	/usr/include/c++/v1/__locale:530:12:
 #	  error: use of undeclared identifier 'isascii'
 #
-# bazel と同じ flag を手で並べて clang に食わせると通るので、-std=c++17 は
-# 無実だった。DragonFly でも同じ順で誤診し、同じ対処で直っている。
-FLAGS="$FLAGS --features=-layering_check --host_features=-layering_check"
-FLAGS="$FLAGS --features=-module_maps --host_features=-module_maps"
-
+# Linux では出ない。libstdc++ は isascii を使わないためで、FreeBSD 系と
+# libc++ の組でだけ現れる。
+#
+# 命令行の -U_POSIX_C_SOURCE では消せない。#define が source の側に在って、
+# 命令行より後に効くからである。sys/cdefs.h には include guard が在るので、
+# 先に読ませておくと __BSD_VISIBLE が 1 のまま固定され、後の #define が
+# 何も変えられなくなる。
+#
+# 三度読み違えた。-std=c++17 のせいだと思い、次に module map のせいだと思い、
+# 実際は source の #define だった。手で clang に食わせて切り分けた結果が
+# これで、8 件 → 0 件になる。
+FLAGS="$FLAGS --copt=-include --copt=sys/cdefs.h"
+FLAGS="$FLAGS --host_copt=-include --host_copt=sys/cdefs.h"
 case "$(uname -s)" in
 OpenBSD)
 	# C++ のオブジェクトを C のドライバでリンクするので、C++ の
@@ -135,7 +148,10 @@ OpenBSD)
 	;;
 DragonFly)
 	# base の cc は gcc 8.3 で libstdc++ が C++17 に足りない。clang を
-	# 使い、module map 経由で libstdc++ を読ませない。
+	# 使う。module map 経由でその libstdc++ を読むと <cwchar> が壊れる
+	# ので、そちらも落とす。これは isascii とは別の話である。
+	FLAGS="$FLAGS --features=-layering_check --host_features=-layering_check"
+	FLAGS="$FLAGS --features=-module_maps --host_features=-module_maps"
 	;;
 esac
 
