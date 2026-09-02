@@ -54,6 +54,25 @@ M
 #	  @@bazel_tools//tools/python:toolchain_type
 #
 # で落ちる。system の python3 を使う runtime_env_toolchains を足す。
+# bazel 自身の java_toolchain は BUILD で remotejdk_25 を名指ししている。
+#
+#	default_java_toolchain(
+#	    name = "java_toolchain_%s" % language_version,
+#	    java_runtime = "@rules_java//toolchains:remotejdk_25",
+#
+# remotejdk が配られているのは Linux/macOS/Windows だけなので、BSD では
+#
+#	While resolving toolchains for target @@rules_java+//toolchains:remotejdk_25
+#	No matching toolchains found for types:
+#	  @@bazel_tools//tools/jdk:runtime_toolchain_type
+#
+# になる。--java_runtime_version はこの名指しを上書きしないので flag では
+# 避けられない。current_java_runtime は登録済みの runtime toolchain を引く
+# alias なので、JDK 25 の在る箱でも 21 しか無い箱でも同じように通る。
+# 言語版は BUILD が 8 / 21 / 25 を定義しているので、21 は正規の値である。
+sed -i.bak 's|"@rules_java//toolchains:remotejdk_25"|"@rules_java//toolchains:current_java_runtime"|' BUILD
+grep -q "toolchains:current_java_runtime" BUILD || { echo "BUILD の書き換えが当たっていない"; exit 1; }
+
 FLAGS="--java_runtime_version=local_jdk --tool_java_runtime_version=local_jdk"
 FLAGS="$FLAGS --java_language_version=$JAVA_VER"
 FLAGS="$FLAGS --tool_java_language_version=$JAVA_VER"
