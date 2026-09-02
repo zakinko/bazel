@@ -85,7 +85,7 @@ jobs:
             ftp -o /tmp/xbase.tar.xz "https://cdn.NetBSD.org/pub/NetBSD/NetBSD-11.0/$SET/binary/sets/xbase.tar.xz"
             tar -C / -xf /tmp/xbase.tar.xz
             /usr/sbin/pkg_add -U pkgin
-            pkgin -y install openjdk21 bash zip unzip python313 git curl gmake
+            pkgin -y install openjdk21 bash zip unzip python313 git curl gmake go126
           run: |
             export JAVA_HOME=/usr/pkg/java/openjdk21
             export PATH=$JAVA_HOME/bin:/usr/pkg/bin:$PATH
@@ -116,7 +116,7 @@ jobs:
           mem: 8192
           copyback: false
           prepare: |
-            pkg_add -I jdk%21 bash zip unzip-- python%3 git curl gmake
+            pkg_add -I jdk%21 bash zip unzip-- python%3 git curl gmake go
           run: |
             export JAVA_HOME=/usr/local/jdk-21
             export PATH=$JAVA_HOME/bin:/usr/local/bin:$PATH
@@ -148,7 +148,7 @@ jobs:
           copyback: false
           prepare: |
             mount -t procfs proc /proc || true
-            pkg install -y openjdk21 python3 zip unzip bash git wget gmake llvm
+            pkg install -y openjdk21 python3 zip unzip bash git wget gmake llvm go
           run: |
             export JAVA_HOME=/usr/local/openjdk21
             export PATH=$JAVA_HOME/bin:/usr/local/bin:$PATH

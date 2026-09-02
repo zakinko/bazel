@@ -79,6 +79,35 @@ FLAGS="$FLAGS --tool_java_language_version=$JAVA_VER"
 FLAGS="$FLAGS --extra_toolchains=@rules_python//python/runtime_env_toolchains:all"
 FLAGS="$FLAGS --host_linkopt=-lm --linkopt=-lm"
 
+# cc_configure は BAZEL_CXXOPTS が無ければ -std=c++17 を既定にする。それだと
+# __STRICT_ANSI__ が立ち、BSD の header が C99 と POSIX の名前を隠す。FreeBSD
+# では libc++ の __locale がその一つを使っていて、protobuf がそこで落ちる。
+#
+#	/usr/include/c++/v1/__locale:530:12:
+#	  error: use of undeclared identifier 'isascii'
+#
+# gnu++17 なら __STRICT_ANSI__ が立たないので header がそれらを出す。最初は
+# DragonFly だけの話だと思っていたが、同じ根が FreeBSD にもあった。
+FLAGS="$FLAGS --repo_env=BAZEL_CXXOPTS=-std=gnu++17"
+FLAGS="$FLAGS --host_action_env=BAZEL_CXXOPTS=-std=gnu++17"
+FLAGS="$FLAGS --cxxopt=-std=gnu++17 --host_cxxopt=-std=gnu++17"
+
+# pkgsrc も dports も go を PATH に置かず /usr/pkg/go1NN や /usr/local/go1NN に
+# 入れる。版の大きい方から見る。glob は昇順なので素直に先頭を採ると一番古い
+# ものを掴む。
+if ! command -v go >/dev/null 2>&1; then
+	for d in $(ls -d /usr/pkg/go1* /usr/local/go1* /usr/local/go 2>/dev/null | sort -r); do
+		if [ -x "$d/bin/go" ]; then
+			PATH="$d/bin:$PATH"
+			export PATH
+			break
+		fi
+	done
+fi
+if command -v go >/dev/null 2>&1; then
+	FLAGS="$FLAGS --repo_env=GOROOT=$(go env GOROOT)"
+fi
+
 case "$(uname -s)" in
 OpenBSD)
 	# C++ のオブジェクトを C のドライバでリンクするので、C++ の
@@ -90,9 +119,6 @@ OpenBSD)
 DragonFly)
 	# base の cc は gcc 8.3 で libstdc++ が C++17 に足りない。clang を
 	# 使い、module map 経由で libstdc++ を読ませない。
-	FLAGS="$FLAGS --repo_env=BAZEL_CXXOPTS=-std=gnu++17"
-	FLAGS="$FLAGS --host_action_env=BAZEL_CXXOPTS=-std=gnu++17"
-	FLAGS="$FLAGS --cxxopt=-std=gnu++17 --host_cxxopt=-std=gnu++17"
 	FLAGS="$FLAGS --features=-layering_check --host_features=-layering_check"
 	FLAGS="$FLAGS --features=-module_maps --host_features=-module_maps"
 	;;
