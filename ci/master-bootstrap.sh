@@ -27,24 +27,69 @@ PROTOC=${PROTOC:-$(command -v protoc || true)}
 [ -x "$PROTOC" ] || { echo "protoc が無い。package を入れる"; exit 1; }
 "$PROTOC" --version
 
+# protobuf が 30 より古いと二つ足りない。grpc-java の HEAD が呼ぶ
+# java::QualifiedClassName が無く、libprotoc が java::ClassName を export
+# もしていない (header には在るのに .so に出ていない)。DragonFly の dports は
+# 29.3 が最新なので、そこだけ source から組む。静的に組めば visibility に
+# 関わらず記号が取れる。
+PBMAJ=$("$PROTOC" --version | awk '{print $2}' | cut -d. -f1)
+if [ "${PBMAJ:-0}" -lt 30 ]; then
+	echo "=== protobuf $PBMAJ は古い。${PB_VER:-34.1} を source から組む"
+	PB=$W/pbsrc
+	if [ ! -f "$PB/protobuf/b/protoc" ]; then
+		mkdir -p "$PB" && cd "$PB"
+		rm -rf protobuf
+		git clone -q --depth 1 -b "v${PB_VER:-34.1}" --recurse-submodules \
+			https://github.com/protocolbuffers/protobuf.git protobuf
+		mkdir -p protobuf/b && cd protobuf/b
+		cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release \
+			-DCMAKE_CXX_STANDARD=17 \
+			-Dprotobuf_BUILD_TESTS=OFF \
+			-Dprotobuf_BUILD_SHARED_LIBS=OFF \
+			-Dprotobuf_ABSL_PROVIDER=module \
+			-DCMAKE_POSITION_INDEPENDENT_CODE=ON > cmake.log 2>&1 ||
+			{ tail -25 cmake.log; exit 1; }
+		ninja -j"${JOBS:-2}" protoc libprotoc.a libprotobuf.a > build.log 2>&1 ||
+			{ tail -30 build.log; exit 1; }
+	fi
+	PROTOC=$PB/protobuf/b/protoc
+	PB_INC="-I$PB/protobuf/src"
+	PB_LIB="$PB/protobuf/b/libprotoc.a $PB/protobuf/b/libprotobuf.a"
+	"$PROTOC" --version
+	cd "$W"
+fi
+
 echo "=== protoc-gen-grpc-java を組む"
 PLUGIN=$W/tools/protoc-gen-grpc-java
 if [ ! -x "$PLUGIN" ]; then
 	mkdir -p "$W/tools"
 	rm -rf "$W/tools/grpc-java"
-	# tag を固定する。HEAD は java::QualifiedClassName を呼ぶが、それが
-	# 在るのは protobuf 30 以降で、DragonFly の dports は 29.3 が最新
-	# なので通らない (java/names.h には ClassName しか無い)。release の
-	# tag はどれもその API を使っていない。
-	git clone -q --depth 1 -b "${GRPC_JAVA_TAG:-v1.76.0}" \
+	# HEAD を使う。release の tag (v1.76.0 まで) は edition 2024 を
+	# 宣言しておらず、master の proto を渡すと
+	#
+	#	execution_graph_writer.proto: is a file using edition 2024,
+	#	  which isn't supported by code generator protoc-gen-grpc
+	#
+	# で落ちる。HEAD は java::QualifiedClassName を呼ぶので protobuf 30
+	# 以降が要るが、それは下で面倒を見る。
+	git clone -q --depth 1 ${GRPC_JAVA_TAG:+-b $GRPC_JAVA_TAG} \
 		https://github.com/grpc/grpc-java.git "$W/tools/grpc-java"
 	cd "$W/tools/grpc-java/compiler/src/java_plugin/cpp"
 	# pkg-config の cflags は protobuf 34 だと -DNOMINMAX を百回以上
 	# 繰り返して返すが、害は無いのでそのまま渡す。
-	CF=$(pkg-config --cflags protobuf 2>/dev/null || echo -I/usr/local/include)
-	LF=$(pkg-config --libs protobuf 2>/dev/null || echo "-L/usr/local/lib -lprotobuf")
-	${CXX:-clang++} -std=gnu++17 $CF java_generator.cpp java_plugin.cpp \
-		-o "$PLUGIN" -lprotoc $LF
+	if [ -n "${PB_LIB:-}" ]; then
+		# source から組んだ静的な libprotoc へ繋ぐ。abseil も同じ木の
+		# ものを使う (package の版と混ぜると記号が食い違う)。
+		AB=$(ls -d "$W"/pbsrc/protobuf/b/_deps/absl-build 2>/dev/null | head -1)
+		ABL=$(find "${AB:-/nonexistent}" -name 'libabsl_*.a' 2>/dev/null | tr '\n' ' ')
+		${CXX:-clang++} -std=gnu++17 $PB_INC java_generator.cpp java_plugin.cpp \
+			-o "$PLUGIN" $PB_LIB $ABL -lpthread
+	else
+		CF=$(pkg-config --cflags protobuf 2>/dev/null || echo -I/usr/local/include)
+		LF=$(pkg-config --libs protobuf 2>/dev/null || echo "-L/usr/local/lib -lprotobuf")
+		${CXX:-clang++} -std=gnu++17 $CF java_generator.cpp java_plugin.cpp \
+			-o "$PLUGIN" -lprotoc $LF
+	fi
 fi
 ls -l "$PLUGIN"
 
