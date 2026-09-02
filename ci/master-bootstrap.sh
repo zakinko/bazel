@@ -299,6 +299,34 @@ PROTOLARK
 echo "=== maven の jar を取る"
 python3 "$BZ/ci/fetch-maven.py" "$SRC" "$SRC/derived/maven"
 
+# maven_install.json に載っていない jar が二つ要る。どちらも本来は
+# derived/jars に入っているもの、つまり bazel が module から建てたものである。
+# Maven Central に同じものが在るので直に取る。版は木が指しているものに合わせる。
+#
+#	protobuf-java-util  maven_install.json の protobuf-java と同じ版
+#	zstd-jni            MODULE.bazel の bazel_dep が指す版
+echo "=== derived/jars の代わりを取る"
+PBV=$(python3 -c "import json;print(json.load(open('$SRC/maven_install.json'))['artifacts']['com.google.protobuf:protobuf-java']['version'])")
+ZSV=$(sed -n 's/.*name = "zstd-jni", version = "\([^"]*\)".*/\1/p' "$SRC/MODULE.bazel" | head -1 | sed 's/\.bcr\.[0-9]*$//')
+mkdir -p "$SRC/derived/maven/extra"
+for u in \
+  "https://repo1.maven.org/maven2/com/google/protobuf/protobuf-java-util/$PBV/protobuf-java-util-$PBV.jar" \
+  "https://repo1.maven.org/maven2/com/github/luben/zstd-jni/$ZSV/zstd-jni-$ZSV.jar"; do
+	f=$(basename "$u")
+	[ -s "$SRC/derived/maven/extra/$f" ] ||
+		curl -sfL -o "$SRC/derived/maven/extra/$f" "$u" ||
+		echo "取れない: $u"
+done
+ls -l "$SRC/derived/maven/extra"
+
+# compile.sh の PROTO_FILES は木からずれている。serialization/analysis/proto の
+# 下に proto が在るのに一覧へ入っていないので、そこから生成される Java が
+# 出来ず、package ... does not exist で落ちる。find の対象を足す。
+sed -i.bak 's|^PROTO_FILES=$(find third_party/remoteapis|PROTO_FILES=$(find src/main/java/com/google/devtools/build/lib/skyframe/serialization/analysis/proto third_party/remoteapis|' \
+	scripts/bootstrap/compile.sh
+grep -q "serialization/analysis/proto third_party" scripts/bootstrap/compile.sh ||
+	{ echo "PROTO_FILES の書き換えが当たっていない"; exit 1; }
+
 echo "=== 起こす"
 PROTOC="$PROTOC" GRPC_JAVA_PLUGIN="$PLUGIN" "${BAZEL_SH:-bash}" ./compile.sh
 ./output/bazel --version
