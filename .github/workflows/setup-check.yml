@@ -44,6 +44,10 @@ jobs:
             # go/toolchain:dragonflybsd が無い。どれも機械の仕度の問題では
             # ないので、対応の入った枝を持ってきて建て、setup script が
             # 仕度した機械でそれが通ることを見る。
+            # 枝の当て物が rules_go に host の Go を使わせる (rules_go は
+            # BSD 向けの SDK を配っていない)。setup script には入れない。
+            # 素の bootstrap が要るものではなく、ここで建てるものの都合だから。
+            pkg_add -I go || true
             cd /root && rm -rf src && git clone -q --depth 1 \
               -b netbsd-ci https://github.com/zakinko/bazel.git src
             SRCDIR=/root/src sh /root/src/ci/bsd-bootstrap.sh
@@ -76,6 +80,10 @@ jobs:
             # go/toolchain:dragonflybsd が無い。どれも機械の仕度の問題では
             # ないので、対応の入った枝を持ってきて建て、setup script が
             # 仕度した機械でそれが通ることを見る。
+            # 枝の当て物が rules_go に host の Go を使わせる (rules_go は
+            # BSD 向けの SDK を配っていない)。setup script には入れない。
+            # 素の bootstrap が要るものではなく、ここで建てるものの都合だから。
+            pkgin -y install go126 || pkgin -y install go || true
             cd /root && rm -rf src && git clone -q --depth 1 \
               -b netbsd-ci https://github.com/zakinko/bazel.git src
             SRCDIR=/root/src sh /root/src/ci/bsd-bootstrap.sh
@@ -104,6 +112,10 @@ jobs:
             # go/toolchain:dragonflybsd が無い。機械の仕度の問題ではないので、
             # 対応の入った枝を持ってきて建て、setup script が仕度した機械で
             # それが通ることを見る。
+            # 枝の当て物が rules_go に host の Go を使わせる (rules_go は
+            # BSD 向けの SDK を配っていない)。setup script には入れない。
+            # 素の bootstrap が要るものではなく、ここで建てるものの都合だから。
+            pkg install -y go || true
             cd /root && rm -rf src && git clone -q --depth 1 \
               -b netbsd-ci https://github.com/zakinko/bazel.git src
             SRCDIR=/root/src sh /root/src/ci/bsd-bootstrap.sh
