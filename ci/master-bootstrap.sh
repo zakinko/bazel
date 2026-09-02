@@ -236,9 +236,9 @@ echo "EXTRA_BAZEL_ARGS=$EXTRA_BAZEL_ARGS"
 # 渡されているので、その下に置けば compile.sh を触らずに済む。
 echo "=== googleapis の proto を置く"
 GAPI=$SRC/third_party/remoteapis/google
+B=https://raw.githubusercontent.com/googleapis/googleapis/master/google
 if [ ! -f "$GAPI/rpc/status.proto" ]; then
 	mkdir -p "$GAPI/api" "$GAPI/rpc" "$GAPI/longrunning" "$GAPI/bytestream"
-	B=https://raw.githubusercontent.com/googleapis/googleapis/master/google
 	for f in api/annotations.proto api/http.proto api/client.proto \
 		 api/field_behavior.proto api/launch_stage.proto \
 		 api/resource.proto rpc/status.proto rpc/code.proto \
@@ -322,10 +322,23 @@ ls -l "$SRC/derived/maven/extra"
 # compile.sh の PROTO_FILES は木からずれている。serialization/analysis/proto の
 # 下に proto が在るのに一覧へ入っていないので、そこから生成される Java が
 # 出来ず、package ... does not exist で落ちる。find の対象を足す。
-sed -i.bak 's|^PROTO_FILES=$(find third_party/remoteapis|PROTO_FILES=$(find src/main/java/com/google/devtools/build/lib/skyframe/serialization/analysis/proto third_party/remoteapis|' \
+ADD="src/main/java/com/google/devtools/build/lib/skyframe/serialization/analysis/proto"
+ADD="$ADD src/main/java/com/google/devtools/build/lib/sandbox/cgroups/proto"
+sed -i.bak "s|^PROTO_FILES=\$(find third_party/remoteapis|PROTO_FILES=\$(find $ADD third_party/remoteapis|" \
 	scripts/bootstrap/compile.sh
-grep -q "serialization/analysis/proto third_party" scripts/bootstrap/compile.sh ||
+grep -q "cgroups/proto .*third_party" scripts/bootstrap/compile.sh ||
 	{ echo "PROTO_FILES の書き換えが当たっていない"; exit 1; }
+
+# com.google.devtools.build.v1 (Build Event Service) の proto も木に無い。
+# third_party/google/devtools/build/v1 には BUILD しか置かれておらず、実体は
+# googleapis から来る。-Ithird_party/remoteapis/ の下へ置く。
+if [ ! -f "$GAPI/devtools/build/v1/build_events.proto" ]; then
+	mkdir -p "$GAPI/devtools/build/v1"
+	for f in build_events.proto build_status.proto publish_build_event.proto; do
+		curl -sfL -o "$GAPI/devtools/build/v1/$f" \
+			"$B/devtools/build/v1/$f" || { echo "$f を取れない"; exit 1; }
+	done
+fi
 
 # master の Java の source は二箇所だけ無名変数 (Java 22) を使っている。
 #
