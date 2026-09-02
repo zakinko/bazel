@@ -39,14 +39,14 @@ if [ "${PBMAJ:-0}" -lt 30 ]; then
 	if [ ! -f "$PB/protobuf/b/protoc" ]; then
 		mkdir -p "$PB" && cd "$PB"
 		rm -rf protobuf
-		git clone -q --depth 1 -b "v${PB_VER:-34.1}" --recurse-submodules \
+		git clone -q --depth 1 -b "v${PB_VER:-34.1}" \
 			https://github.com/protocolbuffers/protobuf.git protobuf
 		mkdir -p protobuf/b && cd protobuf/b
 		cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release \
 			-DCMAKE_CXX_STANDARD=17 \
 			-Dprotobuf_BUILD_TESTS=OFF \
 			-Dprotobuf_BUILD_SHARED_LIBS=OFF \
-			-Dprotobuf_ABSL_PROVIDER=module \
+			-Dprotobuf_ABSL_PROVIDER=package \
 			-DCMAKE_POSITION_INDEPENDENT_CODE=ON > cmake.log 2>&1 ||
 			{ tail -25 cmake.log; exit 1; }
 		ninja -j"${JOBS:-2}" protoc libprotoc.a libprotobuf.a > build.log 2>&1 ||
@@ -80,9 +80,10 @@ if [ ! -x "$PLUGIN" ]; then
 	if [ -n "${PB_LIB:-}" ]; then
 		# source から組んだ静的な libprotoc へ繋ぐ。abseil も同じ木の
 		# ものを使う (package の版と混ぜると記号が食い違う)。
-		AB=$(ls -d "$W"/pbsrc/protobuf/b/_deps/absl-build 2>/dev/null | head -1)
-		ABL=$(find "${AB:-/nonexistent}" -name 'libabsl_*.a' 2>/dev/null | tr '\n' ' ')
-		${CXX:-clang++} -std=gnu++17 $PB_INC java_generator.cpp java_plugin.cpp \
+		ABL=$(pkg-config --libs absl_log_internal_message absl_strings 2>/dev/null ||
+			echo "-L/usr/local/lib $(ls /usr/local/lib/libabsl_*.so 2>/dev/null | sed 's|.*/lib|-l|; s|\.so$||' | tr '\n' ' ')")
+		${CXX:-clang++} -std=gnu++17 $PB_INC -I/usr/local/include \
+			java_generator.cpp java_plugin.cpp \
 			-o "$PLUGIN" $PB_LIB $ABL -lpthread
 	else
 		CF=$(pkg-config --cflags protobuf 2>/dev/null || echo -I/usr/local/include)
@@ -234,12 +235,12 @@ echo "EXTRA_BAZEL_ARGS=$EXTRA_BAZEL_ARGS"
 echo "=== googleapis の proto を置く"
 GAPI=$SRC/third_party/remoteapis/google
 if [ ! -f "$GAPI/rpc/status.proto" ]; then
-	mkdir -p "$GAPI/api" "$GAPI/rpc" "$GAPI/longrunning"
+	mkdir -p "$GAPI/api" "$GAPI/rpc" "$GAPI/longrunning" "$GAPI/bytestream"
 	B=https://raw.githubusercontent.com/googleapis/googleapis/master/google
 	for f in api/annotations.proto api/http.proto api/client.proto \
 		 api/field_behavior.proto api/launch_stage.proto \
 		 api/resource.proto rpc/status.proto rpc/code.proto \
-		 longrunning/operations.proto; do
+		 longrunning/operations.proto bytestream/bytestream.proto; do
 		curl -sfL -o "$GAPI/$f" "$B/$f" ||
 			{ echo "$f を取れない"; exit 1; }
 	done
