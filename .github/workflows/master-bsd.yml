@@ -1,12 +1,17 @@
 # bazel の master が BSD で建つかを測る。9.2.0 ではなく master を見る。
-# master は git 木なので compile.sh が使えない (PROTOC を要る)。package の
-# bazel9 を踏み台にして //src:bazel を建てる。
+#
+# master は git の木なので compile.sh が使えない。踏み台の bazel が要る。
+# FreeBSD と GhostBSD には package の bazel9 が在るのでそれを使い、
+# NetBSD OpenBSD DragonFly には無いので、まず 9.2.0 を dist archive から
+# すっぴんで建てて、その output/bazel を踏み台にする。
 name: master on BSD
 
 on:
   push:
     paths:
       - '.github/workflows/master-bsd.yml'
+      - 'ci/master-build.sh'
+      - 'ci/bsd-bootstrap.sh'
       - 'ci/rules_cc_859.patch'
   workflow_dispatch:
 
@@ -33,22 +38,10 @@ jobs:
           run: |
             export JAVA_HOME=/usr/local/openjdk25
             export PATH=$JAVA_HOME/bin:/usr/local/bin:$PATH
-            command -v bazel bazel9 || true
-            B=$(command -v bazel9 || command -v bazel)
-            $B --version || true
-            cd /root && rm -rf mst && git clone -q --depth 1 https://github.com/bazelbuild/bazel.git mst
-            cd mst && git log --oneline -1
-            mkdir -p toolchain_local && cp "$GITHUB_WORKSPACE/ci/rules_cc_859.patch" toolchain_local/
-            : > toolchain_local/BUILD
-            cat >> MODULE.bazel <<'M'
-
-            single_version_override(
-                module_name = "rules_cc",
-                patch_strip = 1,
-                patches = ["//toolchain_local:rules_cc_859.patch"],
-            )
-            M
-            $B build //src:bazel --tool_java_runtime_version=local_jdk --java_language_version=25 --tool_java_language_version=25 --jobs=2
+            export JAVA_VER=25
+            export PATCH859="$GITHUB_WORKSPACE/ci/rules_cc_859.patch"
+            export B=$(command -v bazel9 || command -v bazel)
+            sh "$GITHUB_WORKSPACE/ci/master-build.sh"
 
   ghostbsd:
     name: GhostBSD (master)
@@ -68,21 +61,10 @@ jobs:
           run: |
             export JAVA_HOME=/usr/local/openjdk25
             export PATH=$JAVA_HOME/bin:/usr/local/bin:$PATH
-            B=$(command -v bazel9 || command -v bazel)
-            $B --version || true
-            cd /root && rm -rf mst && git clone -q --depth 1 https://github.com/bazelbuild/bazel.git mst
-            cd mst && git log --oneline -1
-            mkdir -p toolchain_local && cp "$GITHUB_WORKSPACE/ci/rules_cc_859.patch" toolchain_local/
-            : > toolchain_local/BUILD
-            cat >> MODULE.bazel <<'M'
-
-            single_version_override(
-                module_name = "rules_cc",
-                patch_strip = 1,
-                patches = ["//toolchain_local:rules_cc_859.patch"],
-            )
-            M
-            $B build //src:bazel --tool_java_runtime_version=local_jdk --java_language_version=25 --tool_java_language_version=25 --jobs=2
+            export JAVA_VER=25
+            export PATCH859="$GITHUB_WORKSPACE/ci/rules_cc_859.patch"
+            export B=$(command -v bazel9 || command -v bazel)
+            sh "$GITHUB_WORKSPACE/ci/master-build.sh"
 
   netbsd:
     name: NetBSD (master)
@@ -107,25 +89,13 @@ jobs:
           run: |
             export JAVA_HOME=/usr/pkg/java/openjdk21
             export PATH=$JAVA_HOME/bin:/usr/pkg/bin:$PATH
-            # pkgsrc の bazel が要るが binary が無いことがある。無ければ
-            # 9.2.0 を踏み台に建てる。
-            pkgin -y install bazel || true
-            B=$(command -v bazel || true)
-            if [ -z "$B" ]; then echo "bazel の package が無い"; exit 78; fi
-            $B --version || true
-            cd /root && rm -rf mst && git clone -q --depth 1 https://github.com/bazelbuild/bazel.git mst
-            cd mst && git log --oneline -1
-            mkdir -p toolchain_local && cp "$GITHUB_WORKSPACE/ci/rules_cc_859.patch" toolchain_local/
-            : > toolchain_local/BUILD
-            cat >> MODULE.bazel <<'M'
-
-            single_version_override(
-                module_name = "rules_cc",
-                patch_strip = 1,
-                patches = ["//toolchain_local:rules_cc_859.patch"],
-            )
-            M
-            $B build //src:bazel --tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2
+            export JAVA_VER=21
+            export PATCH859="$GITHUB_WORKSPACE/ci/rules_cc_859.patch"
+            # pkgsrc に bazel が無いので 9.2.0 をすっぴんで建てて踏み台にする。
+            PLAIN=1 SRCDIR="$GITHUB_WORKSPACE" \
+              sh "$GITHUB_WORKSPACE/ci/bsd-bootstrap.sh"
+            export B=$(cat /tmp/bootstrap-bazel-path)
+            sh "$GITHUB_WORKSPACE/ci/master-build.sh"
 
   openbsd:
     name: OpenBSD (master)
@@ -144,24 +114,14 @@ jobs:
           run: |
             export JAVA_HOME=/usr/local/jdk-21
             export PATH=$JAVA_HOME/bin:/usr/local/bin:$PATH
-            ulimit -n 4096 || true
-            pkg_add -I bazel 2>/dev/null || true
-            B=$(command -v bazel || true)
-            if [ -z "$B" ]; then echo "bazel の package が無い"; exit 78; fi
-            $B --version || true
-            cd /root && rm -rf mst && git clone -q --depth 1 https://github.com/bazelbuild/bazel.git mst
-            cd mst && git log --oneline -1
-            mkdir -p toolchain_local && cp "$GITHUB_WORKSPACE/ci/rules_cc_859.patch" toolchain_local/
-            : > toolchain_local/BUILD
-            cat >> MODULE.bazel <<'M'
-
-            single_version_override(
-                module_name = "rules_cc",
-                patch_strip = 1,
-                patches = ["//toolchain_local:rules_cc_859.patch"],
-            )
-            M
-            $B build //src:bazel --tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2
+            export JAVA_VER=21
+            export PATCH859="$GITHUB_WORKSPACE/ci/rules_cc_859.patch"
+            # ports の bazel は 6.5.0 で master を建てられない。すっぴんの
+            # 9.2.0 を建てて踏み台にする。
+            PLAIN=1 SRCDIR="$GITHUB_WORKSPACE" \
+              sh "$GITHUB_WORKSPACE/ci/bsd-bootstrap.sh"
+            export B=$(cat /tmp/bootstrap-bazel-path)
+            sh "$GITHUB_WORKSPACE/ci/master-build.sh"
 
   dragonfly:
     name: DragonFly (master)
@@ -181,20 +141,10 @@ jobs:
           run: |
             export JAVA_HOME=/usr/local/openjdk21
             export PATH=$JAVA_HOME/bin:/usr/local/bin:$PATH
-            pkg install -y bazel9 2>/dev/null || pkg install -y bazel 2>/dev/null || true
-            B=$(command -v bazel9 || command -v bazel || true)
-            if [ -z "$B" ]; then echo "bazel の package が無い"; exit 78; fi
-            $B --version || true
-            cd /root && rm -rf mst && git clone -q --depth 1 https://github.com/bazelbuild/bazel.git mst
-            cd mst && git log --oneline -1
-            mkdir -p toolchain_local && cp "$GITHUB_WORKSPACE/ci/rules_cc_859.patch" toolchain_local/
-            : > toolchain_local/BUILD
-            cat >> MODULE.bazel <<'M'
-
-            single_version_override(
-                module_name = "rules_cc",
-                patch_strip = 1,
-                patches = ["//toolchain_local:rules_cc_859.patch"],
-            )
-            M
-            $B build //src:bazel --tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2
+            export JAVA_VER=21
+            export PATCH859="$GITHUB_WORKSPACE/ci/rules_cc_859.patch"
+            # DragonFly には bazel の package が無い。
+            PLAIN=1 SRCDIR="$GITHUB_WORKSPACE" \
+              sh "$GITHUB_WORKSPACE/ci/bsd-bootstrap.sh"
+            export B=$(cat /tmp/bootstrap-bazel-path)
+            sh "$GITHUB_WORKSPACE/ci/master-build.sh"

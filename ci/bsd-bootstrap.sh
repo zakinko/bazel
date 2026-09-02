@@ -199,7 +199,11 @@ PATCHEOF
 	fi
 	"${BAZEL_SH:-bash}" ./compile.sh
 	./output/bazel --version
-	exit $?
+	rc=$?
+	# 踏み台として使えるように在処を書き残す。作業場は空き容量で選ぶので
+	# 呼ぶ側からは決め打ちできない。
+	echo "$WORK/output/bazel" > ${BOOTSTRAP_OUT:-/tmp/bootstrap-bazel-path}
+	exit $rc
 fi
 cd "$SRCDIR"
 # ファイル単位の cp だと VM の中で十数分かかる。tar で流し込む。
