@@ -32,7 +32,10 @@ jobs:
             sh ci/setup-openbsd.sh
             . /etc/profile
             ulimit -n 4096
-            for t in bash unzip python3 gmake javac; do command -v $t; done
+            for t in bash unzip zip python3 gmake javac git; do
+              p=$(command -v $t) || { echo "$t が無い"; exit 1; }
+              printf '%-8s %s\n' "$t" "$p"
+            done
             cd /home && rm -rf b && mkdir b && cd b
             ftp -o dist.zip https://github.com/bazelbuild/bazel/releases/download/9.2.0/bazel-9.2.0-dist.zip
             unzip -q -o dist.zip && rm -f dist.zip
@@ -67,7 +70,10 @@ jobs:
           run: |
             sh ci/setup-netbsd.sh
             . /etc/profile
-            for t in bash unzip python3 gmake javac; do command -v $t; done
+            for t in bash unzip zip python3 gmake javac git; do
+              p=$(command -v $t) || { echo "$t が無い"; exit 1; }
+              printf '%-8s %s\n' "$t" "$p"
+            done
             cd /root && rm -rf b && mkdir b && cd b
             ftp -o dist.zip https://github.com/bazelbuild/bazel/releases/download/9.2.0/bazel-9.2.0-dist.zip
             unzip -q -o dist.zip && rm -f dist.zip
@@ -100,7 +106,10 @@ jobs:
           run: |
             sh ci/setup-dragonflybsd.sh
             . /etc/profile
-            for t in bash unzip python3 gmake javac; do command -v $t; done
+            for t in bash unzip zip python3 gmake javac git; do
+              p=$(command -v $t) || { echo "$t が無い"; exit 1; }
+              printf '%-8s %s\n' "$t" "$p"
+            done
             echo "CC=$CC CXX=$CXX"
             cd /root && rm -rf b && mkdir b && cd b
             fetch -o dist.zip https://github.com/bazelbuild/bazel/releases/download/9.2.0/bazel-9.2.0-dist.zip

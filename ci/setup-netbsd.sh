@@ -39,6 +39,11 @@ pkgin -y install \
   unzip \
   zip
 
+## pkgsrc installs the interpreter as python3.13 and adds no python3; that
+## name comes from pkg_alternatives, which is not installed here.  Several of
+## the tools Bazel builds run "python3" from the path.
+ln -sf python3.13 /usr/pkg/bin/python3
+
 ## The JDK does not put itself on the path, and the bootstrap reads
 ## JAVA_HOME rather than searching for one.
 cat >> /etc/profile <<'EOF'
