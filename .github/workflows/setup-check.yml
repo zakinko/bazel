@@ -36,23 +36,17 @@ jobs:
               p=$(command -v $t) || { echo "$t が無い"; exit 1; }
               printf '%-8s %s\n' "$t" "$p"
             done
-            cd /home && rm -rf b && mkdir b && cd b
-            ftp -o dist.zip https://github.com/bazelbuild/bazel/releases/download/9.2.0/bazel-9.2.0-dist.zip
-            unzip -q -o dist.zip && rm -f dist.zip
-            mkdir -p toolchain_local && cp "$GITHUB_WORKSPACE/ci/rules_cc_859.patch" toolchain_local/
-            : > toolchain_local/BUILD
-            cat >> MODULE.bazel <<'M'
-
-            single_version_override(
-                module_name = "rules_cc",
-                patch_strip = 1,
-                patches = ["//toolchain_local:rules_cc_859.patch"],
-            )
-            M
-            export TMPDIR=/home/b/tmp && mkdir -p $TMPDIR
-            export EXTRA_BAZEL_ARGS="--tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2"
-            bash ./compile.sh
-            ./output/bazel --version
+            # 素の 9.2.0 はどの BSD でも建たない。NetBSD は bazel が action の
+            # shell に /bin/bash をべた書きしていて (OS の列挙に NETBSD が無く
+            # OS.UNKNOWN に落ちる) Cannot run program と言い、OpenBSD は
+            # generate_jvm_module_options.sh の shebang が /bin/bash で
+            # bad interpreter と言い、DragonFly は rules_go の
+            # go/toolchain:dragonflybsd が無い。どれも機械の仕度の問題では
+            # ないので、対応の入った枝を持ってきて建て、setup script が
+            # 仕度した機械でそれが通ることを見る。
+            cd /root && rm -rf src && git clone -q --depth 1 \
+              -b netbsd-ci https://github.com/zakinko/bazel.git src
+            SRCDIR=/root/src sh /root/src/ci/bsd-bootstrap.sh
 
   netbsd:
     name: NetBSD
@@ -74,22 +68,17 @@ jobs:
               p=$(command -v $t) || { echo "$t が無い"; exit 1; }
               printf '%-8s %s\n' "$t" "$p"
             done
-            cd /root && rm -rf b && mkdir b && cd b
-            ftp -o dist.zip https://github.com/bazelbuild/bazel/releases/download/9.2.0/bazel-9.2.0-dist.zip
-            unzip -q -o dist.zip && rm -f dist.zip
-            mkdir -p toolchain_local && cp "$GITHUB_WORKSPACE/ci/rules_cc_859.patch" toolchain_local/
-            : > toolchain_local/BUILD
-            cat >> MODULE.bazel <<'M'
-
-            single_version_override(
-                module_name = "rules_cc",
-                patch_strip = 1,
-                patches = ["//toolchain_local:rules_cc_859.patch"],
-            )
-            M
-            export EXTRA_BAZEL_ARGS="--tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2"
-            bash ./compile.sh
-            ./output/bazel --version
+            # 素の 9.2.0 はどの BSD でも建たない。NetBSD は bazel が action の
+            # shell に /bin/bash をべた書きしていて (OS の列挙に NETBSD が無く
+            # OS.UNKNOWN に落ちる) Cannot run program と言い、OpenBSD は
+            # generate_jvm_module_options.sh の shebang が /bin/bash で
+            # bad interpreter と言い、DragonFly は rules_go の
+            # go/toolchain:dragonflybsd が無い。どれも機械の仕度の問題では
+            # ないので、対応の入った枝を持ってきて建て、setup script が
+            # 仕度した機械でそれが通ることを見る。
+            cd /root && rm -rf src && git clone -q --depth 1 \
+              -b netbsd-ci https://github.com/zakinko/bazel.git src
+            SRCDIR=/root/src sh /root/src/ci/bsd-bootstrap.sh
 
   dragonfly:
     name: DragonFly BSD
@@ -111,19 +100,10 @@ jobs:
               printf '%-8s %s\n' "$t" "$p"
             done
             echo "CC=$CC CXX=$CXX"
-            cd /root && rm -rf b && mkdir b && cd b
-            fetch -o dist.zip https://github.com/bazelbuild/bazel/releases/download/9.2.0/bazel-9.2.0-dist.zip
-            unzip -q -o dist.zip && rm -f dist.zip
-            mkdir -p toolchain_local && cp "$GITHUB_WORKSPACE/ci/rules_cc_859.patch" toolchain_local/
-            : > toolchain_local/BUILD
-            cat >> MODULE.bazel <<'M'
-
-            single_version_override(
-                module_name = "rules_cc",
-                patch_strip = 1,
-                patches = ["//toolchain_local:rules_cc_859.patch"],
-            )
-            M
-            export EXTRA_BAZEL_ARGS="--tool_java_runtime_version=local_jdk --java_language_version=21 --tool_java_language_version=21 --jobs=2"
-            bash ./compile.sh
-            ./output/bazel --version
+            # 素の 9.2.0 はどの BSD でも建たない。DragonFly は rules_go の
+            # go/toolchain:dragonflybsd が無い。機械の仕度の問題ではないので、
+            # 対応の入った枝を持ってきて建て、setup script が仕度した機械で
+            # それが通ることを見る。
+            cd /root && rm -rf src && git clone -q --depth 1 \
+              -b netbsd-ci https://github.com/zakinko/bazel.git src
+            SRCDIR=/root/src sh /root/src/ci/bsd-bootstrap.sh

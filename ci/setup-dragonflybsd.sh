@@ -23,13 +23,18 @@ set -eux
 pkg install -y \
   bash \
   curl \
-  git \
   gmake \
   llvm \
   openjdk21 \
   python3 \
   unzip \
   zip
+
+## git is asked for separately.  The image may already carry git-lite, which
+## conflicts with git, and pkg resolves that by removing git-lite and then
+## giving up on the install -- "Cannot solve problem using SAT solver" - so
+## naming both in one transaction leaves the machine with neither.
+command -v git >/dev/null 2>&1 || pkg install -y git
 
 ## The JDK's package message asks for this, and the JVM can abort partway
 ## through startup without it.
