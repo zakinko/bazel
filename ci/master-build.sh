@@ -88,6 +88,11 @@ FLAGS="$FLAGS --host_linkopt=-lm --linkopt=-lm"
 #
 # gnu++17 なら __STRICT_ANSI__ が立たないので header がそれらを出す。最初は
 # DragonFly だけの話だと思っていたが、同じ根が FreeBSD にもあった。
+# cc_configure は repository rule なので、client の環境変数を見る。flag だけ
+# だと target 構成には届くが exec 構成には届かず、落ちたのは [for tool] の
+# 側だった。DragonFly で効いていた形は export のほうである。
+BAZEL_CXXOPTS=-std=gnu++17
+export BAZEL_CXXOPTS
 FLAGS="$FLAGS --repo_env=BAZEL_CXXOPTS=-std=gnu++17"
 FLAGS="$FLAGS --host_action_env=BAZEL_CXXOPTS=-std=gnu++17"
 FLAGS="$FLAGS --cxxopt=-std=gnu++17 --host_cxxopt=-std=gnu++17"

@@ -86,6 +86,10 @@ jobs:
             tar -C / -xf /tmp/xbase.tar.xz
             /usr/sbin/pkg_add -U pkgin
             pkgin -y install openjdk21 bash zip unzip python313 git curl gmake go126
+            # pkgsrc は python3.13 としてしか入れない。python3 という名前は
+            # pkg_alternatives が作るもので、ここには無い。pkg_tar が
+            # env python3 で呼ぶので結ぶ。
+            ln -sf python3.13 /usr/pkg/bin/python3
           run: |
             export JAVA_HOME=/usr/pkg/java/openjdk21
             export PATH=$JAVA_HOME/bin:/usr/pkg/bin:$PATH
