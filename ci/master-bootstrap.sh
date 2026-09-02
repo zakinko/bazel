@@ -44,7 +44,18 @@ if [ "${PBMAJ:-0}" -lt 30 ]; then
 		git clone -q --depth 1 -b "v${PB_VER:-34.1}" \
 			https://github.com/protocolbuffers/protobuf.git protobuf
 		mkdir -p protobuf/b && cd protobuf/b
+		# protobuf の cmake は absl を find_package で引くが、protoc の
+		# link 行に log_internal の実体が乗らず
+		#
+		#	undefined reference to
+		#	  absl::lts_20250127::log_internal::LogMessage::operator<<
+		#
+		# になる。package の absl は 92 本の共有ライブラリに分かれて
+		# いるので、まとめて繋いでしまう。
+		ABSLALL=$(ls /usr/local/lib/libabsl_*.so 2>/dev/null |
+			sed 's|.*/libabsl_|-labsl_|; s|\.so$||' | tr '\n' ' ')
 		cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release \
+			-DCMAKE_EXE_LINKER_FLAGS="-L/usr/local/lib $ABSLALL" \
 			-DCMAKE_CXX_STANDARD=17 \
 			-Dprotobuf_BUILD_TESTS=OFF \
 			-Dprotobuf_BUILD_SHARED_LIBS=OFF \
