@@ -113,6 +113,18 @@ if command -v go >/dev/null 2>&1; then
 	FLAGS="$FLAGS --repo_env=GOROOT=$(go env GOROOT)"
 fi
 
+# 落ちているのは C++ の方言ではなく modules である。bazel は layering_check の
+# ために module map を渡すが、その経由で libc++ の __locale が <ctype.h> を
+# 読むと、BSD 拡張の isascii が見えなくなる。
+#
+#	/usr/include/c++/v1/__locale:530:12:
+#	  error: use of undeclared identifier 'isascii'
+#
+# bazel と同じ flag を手で並べて clang に食わせると通るので、-std=c++17 は
+# 無実だった。DragonFly でも同じ順で誤診し、同じ対処で直っている。
+FLAGS="$FLAGS --features=-layering_check --host_features=-layering_check"
+FLAGS="$FLAGS --features=-module_maps --host_features=-module_maps"
+
 case "$(uname -s)" in
 OpenBSD)
 	# C++ のオブジェクトを C のドライバでリンクするので、C++ の
@@ -124,8 +136,6 @@ OpenBSD)
 DragonFly)
 	# base の cc は gcc 8.3 で libstdc++ が C++17 に足りない。clang を
 	# 使い、module map 経由で libstdc++ を読ませない。
-	FLAGS="$FLAGS --features=-layering_check --host_features=-layering_check"
-	FLAGS="$FLAGS --features=-module_maps --host_features=-module_maps"
 	;;
 esac
 

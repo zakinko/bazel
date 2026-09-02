@@ -86,6 +86,18 @@ A="$A --extra_toolchains=@rules_python//python/runtime_env_toolchains:all"
 A="$A --host_linkopt=-lm --linkopt=-lm"
 A="$A --cxxopt=-std=gnu++17 --host_cxxopt=-std=gnu++17"
 
+# 落ちているのは C++ の方言ではなく modules である。bazel は layering_check の
+# ために module map を渡すが、その経由で libc++ の __locale が <ctype.h> を
+# 読むと、BSD 拡張の isascii が見えなくなる。
+#
+#	/usr/include/c++/v1/__locale:530:12:
+#	  error: use of undeclared identifier 'isascii'
+#
+# bazel と同じ flag を手で並べて clang に食わせると通るので、-std=c++17 は
+# 無実だった。DragonFly でも同じ順で誤診し、同じ対処で直っている。
+A="$A --features=-layering_check --host_features=-layering_check"
+A="$A --features=-module_maps --host_features=-module_maps"
+
 case "$(uname -s)" in
 OpenBSD)
 	# C++ のオブジェクトを C のドライバでリンクするので、C++ の
@@ -95,8 +107,6 @@ OpenBSD)
 	done
 	;;
 DragonFly)
-	A="$A --features=-layering_check --host_features=-layering_check"
-	A="$A --features=-module_maps --host_features=-module_maps"
 	;;
 esac
 
