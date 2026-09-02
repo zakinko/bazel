@@ -207,6 +207,17 @@ ulimit -d unlimited 2>/dev/null || true
 # compile.sh の run() は既定で各段の出力を溜めて、失敗したときだけ吐く。
 # その一時 file は atexit で消えるので、途中で SIGABRT を食らうと何も残らない。
 export VERBOSE=yes
+# buildenv.sh は JAVA_VERSION=${JAVA_VERSION:-25} なので、環境変数で下げられる。
+# 下げないと compile.sh が
+#
+#	ERROR: JDK version (1.21) is lower than 25, please set $JAVA_HOME.
+#
+# で止まる。pkgsrc も DragonFly の dports も openjdk21 が最新なので、そこでは
+# 下げるしかない。BUILD が java_toolchain を 8 と 21 と 25 について定義して
+# いるので、21 は正規の値である。master の Java の source が 21 で足りるか
+# どうかは、下げて建ててみれば javac が答える。
+JAVA_VERSION=$JAVA_VER
+export JAVA_VERSION
 export EXTRA_BAZEL_ARGS="$A"
 echo "EXTRA_BAZEL_ARGS=$EXTRA_BAZEL_ARGS"
 
