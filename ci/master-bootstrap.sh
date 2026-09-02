@@ -327,6 +327,28 @@ sed -i.bak 's|^PROTO_FILES=$(find third_party/remoteapis|PROTO_FILES=$(find src/
 grep -q "serialization/analysis/proto third_party" scripts/bootstrap/compile.sh ||
 	{ echo "PROTO_FILES の書き換えが当たっていない"; exit 1; }
 
+# master の Java の source は二箇所だけ無名変数 (Java 22) を使っている。
+#
+#	SelectedEntrySerializer.java:264   _ -> new AtomicInteger(0)
+#	DigestHashFunction.java:202        var _ = toCheck.clone();
+#
+#	error: unnamed variables are a preview feature and are disabled by default
+#
+# JDK 21 で建てるときはここだけが引っ掛かる。ほかは 21 で全部通る。
+# pkgsrc も DragonFly の dports も openjdk21 が最新なので、名前を付けて逃げる。
+if [ "$JAVA_VER" -lt 22 ]; then
+	echo "=== 無名変数を JDK $JAVA_VER 向けに直す"
+	sed -i.bak 's|_ -> new AtomicInteger(0))|unused -> new AtomicInteger(0))|' \
+		src/main/java/com/google/devtools/build/lib/skyframe/serialization/analysis/SelectedEntrySerializer.java
+	sed -i.bak 's|var _ = toCheck.clone();|var unused = toCheck.clone();|' \
+		src/main/java/com/google/devtools/build/lib/vfs/DigestHashFunction.java
+	grep -q "unused -> new AtomicInteger" \
+		src/main/java/com/google/devtools/build/lib/skyframe/serialization/analysis/SelectedEntrySerializer.java &&
+	grep -q "var unused = toCheck.clone" \
+		src/main/java/com/google/devtools/build/lib/vfs/DigestHashFunction.java ||
+		{ echo "無名変数の書き換えが当たっていない"; exit 1; }
+fi
+
 echo "=== 起こす"
 PROTOC="$PROTOC" GRPC_JAVA_PLUGIN="$PLUGIN" "${BAZEL_SH:-bash}" ./compile.sh
 ./output/bazel --version
