@@ -1,0 +1,15 @@
+diff -u -r a/python/private/runtime_env_toolchain_interpreter.sh b/python/private/runtime_env_toolchain_interpreter.sh
+--- a/python/private/runtime_env_toolchain_interpreter.sh
++++ b/python/private/runtime_env_toolchain_interpreter.sh
+@@ -77,7 +77,10 @@
+   # binary, not the actual one invoked.
+   # NOTE: exec -a would be simpler, but isn't posix-compatible, and dash shell
+   # (Ubuntu/debian default) doesn't support it; see #3009.
+-  exec sh -c "$PYTHON_BIN \$@" "$venv_bin" "$@"
++  # The inner $@ has to stay quoted, or the shell started by sh -c splits
++  # every argument on whitespace.  Bazel's own proguard_jar rule passes
++  # --timestamp "1980-01-01 00:00:00", which then arrives as two arguments.
++  exec sh -c "$PYTHON_BIN \"\$@\"" "$venv_bin" "$@"
+ else
+   exec "$PYTHON_BIN" "$@"
+ fi

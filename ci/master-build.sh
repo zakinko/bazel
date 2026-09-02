@@ -37,6 +37,29 @@ single_version_override(
 )
 M
 
+
+# rules_python の runtime_env の launcher は sh -c の中の $@ を引用符で
+# 括っていないので、空白を含む引数が割れる。bazel 自身の proguard_jar が
+#
+#	args.add("--timestamp", "1980-01-01 00:00:00")
+#
+# を渡すので、wrapper.py が
+#
+#	wrapper.py: error: unrecognized arguments: 00:00:00
+#
+# で落ちる。出来合いの CPython が在る platform では runtime_env の launcher を
+# 通らないので、BSD でだけ出る。
+if [ -n "${PATCH_RULES_PYTHON:-}" ]; then
+	cp "$PATCH_RULES_PYTHON" toolchain_local/rules_python_quote_args.patch
+	cat >> MODULE.bazel <<'M'
+
+single_version_override(
+    module_name = "rules_python",
+    patch_strip = 1,
+    patches = ["//toolchain_local:rules_python_quote_args.patch"],
+)
+M
+fi
 # master の .bazelrc は --java_runtime_version=remotejdk_25 を指す。remotejdk
 # は Linux/macOS/Windows 向けしか配布されていないので、BSD では
 #

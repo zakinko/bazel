@@ -65,6 +65,29 @@ single_version_override(
 M
 fi
 
+# rules_python の runtime_env の launcher は sh -c の中の $@ を引用符で
+# 括っていないので、空白を含む引数が割れる。bazel 自身の proguard_jar が
+#
+#	args.add("--timestamp", "1980-01-01 00:00:00")
+#
+# を渡すので、wrapper.py が
+#
+#	wrapper.py: error: unrecognized arguments: 00:00:00
+#
+# で落ちる。出来合いの CPython が在る platform では runtime_env の launcher を
+# 通らないので、BSD でだけ出る。
+if [ -n "${PATCH_RULES_PYTHON:-}" ]; then
+	cp "$PATCH_RULES_PYTHON" toolchain_local/rules_python_quote_args.patch
+	cat >> MODULE.bazel <<'M'
+
+single_version_override(
+    module_name = "rules_python",
+    patch_strip = 1,
+    patches = ["//toolchain_local:rules_python_quote_args.patch"],
+)
+M
+fi
+
 # BUILD:345 が java_runtime に remotejdk_25 を名指ししている。remotejdk は
 # BSD 向けが配られていないので、ここで toolchain の解決が失敗する。
 # current_java_runtime は登録済みの runtime toolchain を引く alias。
