@@ -48,9 +48,9 @@ jobs:
             # BSD 向けの SDK を配っていない)。setup script には入れない。
             # 素の bootstrap が要るものではなく、ここで建てるものの都合だから。
             pkg_add -I go || true
-            cd /root && rm -rf src && git clone -q --depth 1 \
+            cd /home && rm -rf src && git clone -q --depth 1 \
               -b netbsd-ci https://github.com/zakinko/bazel.git src
-            SRCDIR=/root/src sh /root/src/ci/bsd-bootstrap.sh
+            SRCDIR=/home/src sh /home/src/ci/bsd-bootstrap.sh
 
   netbsd:
     name: NetBSD
