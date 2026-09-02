@@ -32,7 +32,12 @@ PLUGIN=$W/tools/protoc-gen-grpc-java
 if [ ! -x "$PLUGIN" ]; then
 	mkdir -p "$W/tools"
 	rm -rf "$W/tools/grpc-java"
-	git clone -q --depth 1 https://github.com/grpc/grpc-java.git "$W/tools/grpc-java"
+	# tag を固定する。HEAD は java::QualifiedClassName を呼ぶが、それが
+	# 在るのは protobuf 30 以降で、DragonFly の dports は 29.3 が最新
+	# なので通らない (java/names.h には ClassName しか無い)。release の
+	# tag はどれもその API を使っていない。
+	git clone -q --depth 1 -b "${GRPC_JAVA_TAG:-v1.76.0}" \
+		https://github.com/grpc/grpc-java.git "$W/tools/grpc-java"
 	cd "$W/tools/grpc-java/compiler/src/java_plugin/cpp"
 	# pkg-config の cflags は protobuf 34 だと -DNOMINMAX を百回以上
 	# 繰り返して返すが、害は無いのでそのまま渡す。
