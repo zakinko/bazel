@@ -165,6 +165,31 @@ export VERBOSE=yes
 export EXTRA_BAZEL_ARGS="$A"
 echo "EXTRA_BAZEL_ARGS=$EXTRA_BAZEL_ARGS"
 
+# compile.sh の protoc は third_party/remoteapis を -I に入れているが、そこの
+# proto が import する googleapis の proto は木の中に無い。
+#
+#	remote_execution.proto:20:1: Import "google/api/annotations.proto"
+#	  was not found or had errors.
+#	remote_asset.proto:23:1: Import "google/rpc/status.proto" ...
+#
+# dist archive では derived/src/java が生成済みなのでこの経路を通らない。
+# git の木から起こす道だけが壊れている。-Ithird_party/remoteapis/ は既に
+# 渡されているので、その下に置けば compile.sh を触らずに済む。
+echo "=== googleapis の proto を置く"
+GAPI=$SRC/third_party/remoteapis/google
+if [ ! -f "$GAPI/rpc/status.proto" ]; then
+	mkdir -p "$GAPI/api" "$GAPI/rpc" "$GAPI/longrunning"
+	B=https://raw.githubusercontent.com/googleapis/googleapis/master/google
+	for f in api/annotations.proto api/http.proto api/client.proto \
+		 api/field_behavior.proto api/launch_stage.proto \
+		 api/resource.proto rpc/status.proto rpc/code.proto \
+		 longrunning/operations.proto; do
+		curl -sfL -o "$GAPI/$f" "$B/$f" ||
+			{ echo "$f を取れない"; exit 1; }
+	done
+	ls -R "$GAPI" | head -20
+fi
+
 echo "=== 起こす"
 PROTOC="$PROTOC" GRPC_JAVA_PLUGIN="$PLUGIN" "${BAZEL_SH:-bash}" ./compile.sh
 ./output/bazel --version
