@@ -18,6 +18,8 @@ set -eu
 : "${JAVA_VER:?}"
 W=${W:-$(pwd)}
 SRC=${SRC:-$W/mst}
+# この script が入っている木。fetch-maven.py を隣から呼ぶ。
+BZ=${BZ:-$(cd "$(dirname "$0")/.." && pwd)}
 
 echo "=== 道具"
 uname -a
@@ -276,6 +278,26 @@ extend google.protobuf.FieldOptions {
   optional bool used_in_blaze = 525000;
 }
 PROTOLARK
+
+# compile.sh は classpath を derived/jars と derived/maven から組むが、その
+# 二つは dist archive にしか無い。git の木には derived/ が一つも無く、
+# derived/maven の中身は //:maven-srcs という pkg_tar が作るものなので、
+# 作るには bazel が要る。**bazel を建てるのに要る jar を bazel でしか作れない。**
+#
+# derived/jars が無いときの代替は tools/distributions/debian の一覧、つまり
+# /usr/share の下の distro package で、BSD には無い。何も無いまま進むと
+#
+#	OptionsClassProcessor.java:68: error: cannot find symbol
+#	  private ImmutableMap<TypeMirror, Converter<?>> defaultConverters;
+#	  symbol: class ImmutableMap
+#
+# のように Guava から順に落ちる。
+#
+# 代わりの経路が一つある。maven_install.json は artifact と版と sha256 を
+# 全部持っているので、Maven Central から直に取れる。141 個 83MB で、bazel も
+# dist archive も要らない。
+echo "=== maven の jar を取る"
+python3 "$BZ/ci/fetch-maven.py" "$SRC" "$SRC/derived/maven"
 
 echo "=== 起こす"
 PROTOC="$PROTOC" GRPC_JAVA_PLUGIN="$PLUGIN" "${BAZEL_SH:-bash}" ./compile.sh
