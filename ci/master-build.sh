@@ -152,7 +152,7 @@ echo "=== 建てる"
 echo "target: $TARGET"
 echo "flags: $FLAGS"
 # shellcheck disable=SC2086
-"$B" build $TARGET $FLAGS --jobs=2
+"$B" build $TARGET $FLAGS --jobs=${JOBS:-2}
 
 echo "=== 動かす"
 OUT=$("$B" cquery --output=files $TARGET $FLAGS 2>/dev/null | head -1)
