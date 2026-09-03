@@ -760,6 +760,30 @@ if [ -n "${KEEP_TMP:-}" ]; then
 	echo "  一時 directory を残す"
 fi
 
+# 建てた bazel が起動直後に
+#
+#	FATAL: <unknown> crashed due to an internal error.
+#	java.lang.IllegalArgumentException: No resource with name
+#	  com/google/devtools/build/lib/bazel/rules/builtins_bzl.zip
+#	  at ConfiguredRuleClassProvider$Builder.unpackBuiltinsBzlZipResource
+#
+# で落ちる。この zip は src/builtins_zip.bzl の rule が作るもので、bazel が
+# 要る。compile.sh には作る所が無い。
+#
+# 中身は src/main/starlark/builtins_bzl の下の *.bzl を
+# builtins_bzl/<相対 path> という名前で入れただけなので、zip で組める。
+# compile.sh は src/main/java の下の非 java file を classes へ写すので、
+# resource の名前どおりの場所へ置けば届く。
+echo "=== builtins_bzl.zip を組む"
+BZR=$SRC/src/main/java/com/google/devtools/build/lib/bazel/rules
+if [ ! -s "$BZR/builtins_bzl.zip" ]; then
+	(cd "$SRC/src/main/starlark" &&
+	 find builtins_bzl -name '*.bzl' -print | sort |
+	 zip -q -X "$BZR/builtins_bzl.zip" -@) ||
+		{ echo "builtins_bzl.zip を組めない"; exit 1; }
+fi
+unzip -l "$BZR/builtins_bzl.zip" | tail -1
+
 echo "=== 起こす"
 PROTOC="$PROTOC" GRPC_JAVA_PLUGIN="$PLUGIN" "${BAZEL_SH:-bash}" ./compile.sh
 ./output/bazel --version
