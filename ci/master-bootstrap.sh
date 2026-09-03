@@ -209,12 +209,21 @@ TZF
 			-Dprotobuf_ABSL_PROVIDER=package \
 			-DCMAKE_POSITION_INDEPENDENT_CODE=ON > cmake.log 2>&1 ||
 			{ tail -25 cmake.log; exit 1; }
-		ninja -j"${JOBS:-2}" protoc libprotoc.a libprotobuf.a > build.log 2>&1 ||
+		ninja -j"${JOBS:-2}" > build.log 2>&1 ||
 			{ tail -30 build.log; exit 1; }
 	fi
 	PROTOC=$PB/protobuf/b/protoc
 	PB_INC="-I$PB/protobuf/src"
+	# libprotobuf は utf8_range を呼ぶが、静的に組むと自分では持たない。
+	#
+	#	undefined reference to `utf8_range_IsValid'
+	#	undefined reference to `utf8_range_ValidPrefix'
+	#
+	# 名前は版で変わる (utf8_validity / utf8_range)。在るものを拾う。
 	PB_LIB="$PB/protobuf/b/libprotoc.a $PB/protobuf/b/libprotobuf.a"
+	for extra in $(ls "$PB"/protobuf/b/libutf8_*.a 2>/dev/null); do
+		PB_LIB="$PB_LIB $extra"
+	done
 	PB_ABSL=$AP
 	"$PROTOC" --version
 	cd "$W"
