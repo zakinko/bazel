@@ -146,8 +146,12 @@ VDSO
 				echo "  abseil: DragonFly 向けに GetTID を差し替えた"
 			fi
 			mkdir -p "$PB/absl/b" && cd "$PB/absl/b"
+			# DragonFly の base の libstdc++ は -std=c++17 だと
+			# __STRICT_ANSI__ が立って isblank や wcstof を隠す。
+			# CXX_EXTENSIONS=ON なら gnu++17 になる。
 			cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release \
 				-DCMAKE_CXX_STANDARD=17 \
+				-DCMAKE_CXX_EXTENSIONS=ON \
 				-DABSL_PROPAGATE_CXX_STD=ON \
 				-DBUILD_TESTING=OFF \
 				-DCMAKE_POSITION_INDEPENDENT_CODE=ON \
@@ -163,6 +167,7 @@ VDSO
 		cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release \
 			-DCMAKE_PREFIX_PATH="$AP" \
 			-DCMAKE_CXX_STANDARD=17 \
+			-DCMAKE_CXX_EXTENSIONS=ON \
 			-Dprotobuf_BUILD_TESTS=OFF \
 			-Dprotobuf_BUILD_SHARED_LIBS=OFF \
 			-Dprotobuf_ABSL_PROVIDER=package \
