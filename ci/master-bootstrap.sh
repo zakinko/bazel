@@ -224,7 +224,9 @@ TZF
 	for extra in $(ls "$PB"/protobuf/b/libutf8_*.a 2>/dev/null); do
 		PB_LIB="$PB_LIB $extra"
 	done
-	PB_ABSL=$AP
+	# AP は上の if の中でしか立たない。protoc が既に在って建て直しを
+	# 飛ばしたときは未定義になり、set -u で落ちる。
+	PB_ABSL=$PB/absl-prefix
 	"$PROTOC" --version
 	cd "$W"
 fi
