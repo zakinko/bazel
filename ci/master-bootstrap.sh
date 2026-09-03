@@ -82,6 +82,19 @@ if [ "${PBMAJ:-0}" -lt 30 ]; then
 			rm -rf "$PB/absl"
 			git clone -q --depth 1 -b "$ABV" \
 				https://github.com/abseil/abseil-cpp.git "$PB/absl"
+			# abseil は DragonFly を知らない。GetTID が
+			#
+			#	sysinfo.cc:484: error: static_cast from
+			#	  'pthread_t' to 'pid_t'
+			#
+			# で落ちる。pthread_np.h の pthread_getthreadid_np を
+			# 使う形に直す。FreeBSD の枝をそのまま広げるだけである。
+			if [ "$(uname -s)" = DragonFly ] &&
+			   [ -f "$BZ/ci/abseil_dragonfly.patch" ]; then
+				(cd "$PB/absl" &&
+				 patch -p1 -s -i "$BZ/ci/abseil_dragonfly.patch") ||
+					echo "  abseil の当て物が当たらない"
+			fi
 			mkdir -p "$PB/absl/b" && cd "$PB/absl/b"
 			cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release \
 				-DCMAKE_CXX_STANDARD=17 \
@@ -303,7 +316,7 @@ if [ ! -f "$GAPI/rpc/status.proto" ]; then
 	mkdir -p "$GAPI/api" "$GAPI/rpc" "$GAPI/longrunning" "$GAPI/bytestream"
 	for f in api/annotations.proto api/http.proto api/client.proto \
 		 api/field_behavior.proto api/launch_stage.proto \
-		 api/resource.proto rpc/status.proto rpc/code.proto \
+		 api/resource.proto api/visibility.proto rpc/status.proto rpc/code.proto \
 		 longrunning/operations.proto bytestream/bytestream.proto; do
 		curl -sfL -o "$GAPI/$f" "$B/$f" ||
 			{ echo "$f を取れない"; exit 1; }
