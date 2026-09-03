@@ -587,6 +587,25 @@ JNIPY
 	;;
 esac
 
+# src/main/native/unix_jni.h は stat64 を持たない platform を
+# __APPLE__ / __FreeBSD__ / __OpenBSD__ の三つしか挙げていない。NetBSD にも
+# DragonFly にも stat64 は無いので、そちらは stat64 の枝に落ちて
+#
+#	unix_jni_bsd.cc:66:14: error: invalid use of incomplete type
+#	  'const blaze_jni::portable_stat_struct' {aka 'const struct stat64'}
+#
+# になる。三つの列挙に足すだけである。
+case "$(uname -s)" in
+NetBSD|DragonFly)
+	sed -i.bak \
+	  's|^#if defined(__APPLE__) \|\| defined(__FreeBSD__) \|\| defined(__OpenBSD__)$|#if defined(__APPLE__) \|\| defined(__FreeBSD__) \|\| defined(__OpenBSD__) \|\| \\\n    defined(__NetBSD__) \|\| defined(__DragonFly__)|' \
+	  src/main/native/unix_jni.h
+	grep -q "__NetBSD__" src/main/native/unix_jni.h ||
+		{ echo "unix_jni.h の書き換えが当たっていない"; exit 1; }
+	echo "=== unix_jni.h に NetBSD と DragonFly を足した"
+	;;
+esac
+
 echo "=== 起こす"
 PROTOC="$PROTOC" GRPC_JAVA_PLUGIN="$PLUGIN" "${BAZEL_SH:-bash}" ./compile.sh
 ./output/bazel --version
