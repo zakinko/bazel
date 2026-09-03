@@ -101,6 +101,20 @@ if [ "${PBMAJ:-0}" -lt 30 ]; then
 					{ echo "  abseil の書き換えが当たっていない"; exit 1; }
 				grep -q "defined(__DragonFly__)" "$F" ||
 					{ echo "  pthread_np.h の枝が当たっていない"; exit 1; }
+				# config.h も DragonFly を知らない。ABSL_HAVE_MMAP が
+				# 立たないと poison.cc が
+				#
+				#	poison.cc:79:29: error: use of undeclared
+				#	  identifier 'data'
+				#
+				# になる。#else の枝が data を作らないまま抜けて、
+				# その後で使われるためである。
+				C=$PB/absl/absl/base/config.h
+				sed -i.bak \
+				  -e 's|defined(__XTENSA__)$|defined(__XTENSA__) \|\| defined(__DragonFly__)|' \
+				  -e 's|defined(__NetBSD__) \|\| defined(__VXWORKS__)$|defined(__NetBSD__) \|\| defined(__VXWORKS__) \|\| defined(__DragonFly__)|' \
+				  "$C"
+				grep -c "__DragonFly__" "$C"
 				echo "  abseil: DragonFly 向けに GetTID を差し替えた"
 			fi
 			mkdir -p "$PB/absl/b" && cd "$PB/absl/b"
@@ -524,6 +538,40 @@ fi
 # (それは bootstrap.sh の側)、空で置いておけば cp が通り、第二段は @maven を
 # 網から取る。
 [ -f "$SRC/derived/maven/BUILD.vendor" ] || : > "$SRC/derived/maven/BUILD.vendor"
+
+# scripts/bootstrap/build_unix_jni.sh の case は linux / darwin / openbsd /
+# freebsd の四つしか知らない。NetBSD と DragonFly はどれにも当たらず、
+# -I${JAVA_HOME}/include/<os> が渡らないので
+#
+#	jni.h:45:10: fatal error: jni_md.h: No such file or directory
+#
+# になる。jni_md.h は include/netbsd と include/dragonfly の下に在る。
+# platform ごとの source (unix_jni_bsd.cc) も選ばれない。
+case "$(uname -s)" in
+NetBSD|DragonFly)
+	OSL=$(uname -s | tr 'A-Z' 'a-z')
+	python3 - "$SRC/scripts/bootstrap/build_unix_jni.sh" "$OSL" <<'JNIPY'
+import sys
+p, osl = sys.argv[1], sys.argv[2]
+s = open(p, encoding="utf-8").read()
+if osl + ")" in s:
+    print("  build_unix_jni.sh: 既に %s を知っている" % osl)
+    sys.exit(0)
+mark = "esac\n"
+add = """%s)
+  SOURCES+=(src/main/native/unix_jni_bsd.cc)
+  FLAGS+=("-I${JAVA_HOME}/include/%s")
+  ;;
+esac
+""" % (osl, osl)
+i = s.index(mark)
+open(p, "w", encoding="utf-8").write(s[:i] + add + s[i + len(mark):])
+print("  build_unix_jni.sh: %s を足した" % osl)
+JNIPY
+	grep -q "^$OSL)" "$SRC/scripts/bootstrap/build_unix_jni.sh" ||
+		{ echo "build_unix_jni.sh の書き換えが当たっていない"; exit 1; }
+	;;
+esac
 
 echo "=== 起こす"
 PROTOC="$PROTOC" GRPC_JAVA_PLUGIN="$PLUGIN" "${BAZEL_SH:-bash}" ./compile.sh
