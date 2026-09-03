@@ -109,6 +109,34 @@ if [ "${PBMAJ:-0}" -lt 30 ]; then
 				#
 				# になる。#else の枝が data を作らないまま抜けて、
 				# その後で使われるためである。
+				# vdso_support.cc は NetBSD と FreeBSD の別名は
+				# 知っているが DragonFly は知らない。
+				#
+				#	vdso_support.cc:112:5: error: unknown
+				#	  type name 'Elf64_auxv_t'
+				#
+				# FreeBSD の枝と同じ形で足す。
+				python3 - "$PB/absl/absl/debugging/internal/vdso_support.cc" <<'VDSO'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="utf-8").read()
+mark = "#if defined(__FreeBSD__)\n#if defined(__ELF_WORD_SIZE) && __ELF_WORD_SIZE == 64\nusing Elf64_auxv_t = Elf64_Auxinfo;\n#endif\nusing Elf32_auxv_t = Elf32_Auxinfo;\n#endif\n"
+add = mark + """#if defined(__DragonFly__)
+#if defined(__ELF_WORD_SIZE) && __ELF_WORD_SIZE == 64
+using Elf64_auxv_t = Elf64_Auxinfo;
+#endif
+using Elf32_auxv_t = Elf32_Auxinfo;
+#endif
+"""
+if "__DragonFly__" in s:
+    print("  vdso_support.cc: 既に当たっている")
+elif mark in s:
+    open(p, "w", encoding="utf-8").write(s.replace(mark, add, 1))
+    print("  vdso_support.cc: DragonFly の別名を足した")
+else:
+    print("  vdso_support.cc: 当てる場所が見つからない")
+    sys.exit(1)
+VDSO
 				C=$PB/absl/absl/base/config.h
 				sed -i.bak \
 				  -e 's|defined(__XTENSA__)$|defined(__XTENSA__) \|\| defined(__DragonFly__)|' \
