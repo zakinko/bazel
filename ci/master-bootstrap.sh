@@ -539,6 +539,20 @@ fi
 # 網から取る。
 [ -f "$SRC/derived/maven/BUILD.vendor" ] || : > "$SRC/derived/maven/BUILD.vendor"
 
+# compile.sh は bootstrap.sh を読み込んで bazel_build を呼び、その中で
+#
+#	--override_repository=$(cat derived/maven/MAVEN_CANONICAL_REPO_NAME)=derived/maven
+#
+# を渡す。MAVEN_CANONICAL_REPO_NAME も derived/maven の BUILD も
+# rules_jvm_external が生成するもので、dist archive にしか無い。網が在るなら
+# @maven は普通に取ってこられるので、この override を外す。
+sed -i.bak '/--override_repository=\$(cat derived\/maven\/MAVEN_CANONICAL_REPO_NAME)/d' \
+	scripts/bootstrap/bootstrap.sh
+grep -q "MAVEN_CANONICAL_REPO_NAME" scripts/bootstrap/bootstrap.sh &&
+	{ echo "override の行が残っている"; exit 1; }
+sed -i.bak '/^  cp derived\/maven\/BUILD.vendor derived\/maven\/BUILD$/d' \
+	scripts/bootstrap/compile.sh
+
 # scripts/bootstrap/build_unix_jni.sh の case は linux / darwin / openbsd /
 # freebsd の四つしか知らない。NetBSD と DragonFly はどれにも当たらず、
 # -I${JAVA_HOME}/include/<os> が渡らないので
