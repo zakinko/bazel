@@ -65,10 +65,40 @@ if [ "${PBMAJ:-0}" -lt 30 ]; then
 		#
 		# になる。package の absl は 92 本の共有ライブラリに分かれて
 		# いるので、まとめて繋いでしまう。
-		ABSLALL=$(ls /usr/local/lib/libabsl_*.so 2>/dev/null |
-			sed 's|.*/libabsl_|-labsl_|; s|\.so$||' | tr '\n' ' ')
+		# package の absl では駄目だった。31.1 が指す 20250127.0 と
+		# 同じ版を入れても、libabsl_log_internal_message.so に
+		#
+		#	LogMessage::operator<<<int>  (enable_if つきの template)
+		#
+		# の実体が無い。dports がどう組んだかは分からないが、記号が
+		# library に無いのだから繋ぎ方では解けない。abseil も source
+		# から入れて、header と library の出所を一つに揃える。
+		AP=$PB/absl-prefix
+		if [ ! -f "$AP/lib/libabsl_log_internal_message.a" ]; then
+			ABV=$(sed -n 's/.*name = "abseil-cpp", version = "\([0-9.]*\)".*/\1/p' \
+				"$PB/protobuf/MODULE.bazel" 2>/dev/null | head -1)
+			ABV=${ABV:-20250127.0}
+			echo "  abseil $ABV を source から入れる"
+			rm -rf "$PB/absl"
+			git clone -q --depth 1 -b "$ABV" \
+				https://github.com/abseil/abseil-cpp.git "$PB/absl"
+			mkdir -p "$PB/absl/b" && cd "$PB/absl/b"
+			cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release \
+				-DCMAKE_CXX_STANDARD=17 \
+				-DABSL_PROPAGATE_CXX_STD=ON \
+				-DBUILD_TESTING=OFF \
+				-DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+				-DCMAKE_INSTALL_PREFIX="$AP" > cmake.log 2>&1 ||
+				{ tail -20 cmake.log; exit 1; }
+			ninja -j"${JOBS:-2}" > build.log 2>&1 ||
+				{ tail -25 build.log; exit 1; }
+			ninja install > install.log 2>&1 ||
+				{ tail -20 install.log; exit 1; }
+			cd "$PB/protobuf/b"
+		fi
+		ABSLALL=""
 		cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release \
-			-DCMAKE_CXX_STANDARD_LIBRARIES="-L/usr/local/lib $ABSLALL" \
+			-DCMAKE_PREFIX_PATH="$AP" \
 			-DCMAKE_CXX_STANDARD=17 \
 			-Dprotobuf_BUILD_TESTS=OFF \
 			-Dprotobuf_BUILD_SHARED_LIBS=OFF \
@@ -81,6 +111,7 @@ if [ "${PBMAJ:-0}" -lt 30 ]; then
 	PROTOC=$PB/protobuf/b/protoc
 	PB_INC="-I$PB/protobuf/src"
 	PB_LIB="$PB/protobuf/b/libprotoc.a $PB/protobuf/b/libprotobuf.a"
+	PB_ABSL=$AP
 	"$PROTOC" --version
 	cd "$W"
 fi
@@ -106,11 +137,12 @@ if [ ! -x "$PLUGIN" ]; then
 	if [ -n "${PB_LIB:-}" ]; then
 		# source から組んだ静的な libprotoc へ繋ぐ。abseil も同じ木の
 		# ものを使う (package の版と混ぜると記号が食い違う)。
-		ABL=$(pkg-config --libs absl_log_internal_message absl_strings 2>/dev/null ||
-			echo "-L/usr/local/lib $(ls /usr/local/lib/libabsl_*.so 2>/dev/null | sed 's|.*/lib|-l|; s|\.so$||' | tr '\n' ' ')")
-		${CXX:-clang++} -std=gnu++17 $PB_INC -I/usr/local/include \
+		# abseil も protobuf と同じ木のものを使う。package のものと
+		# 混ぜると記号が食い違う。静的なので並び順が要る。
+		ABL=$(ls "$PB_ABSL"/lib/libabsl_*.a 2>/dev/null | tr '\n' ' ')
+		${CXX:-clang++} -std=gnu++17 $PB_INC -I"$PB_ABSL/include" \
 			java_generator.cpp java_plugin.cpp \
-			-o "$PLUGIN" $PB_LIB $ABL -lpthread
+			-o "$PLUGIN" $PB_LIB $ABL $ABL -lpthread
 	else
 		CF=$(pkg-config --cflags protobuf 2>/dev/null || echo -I/usr/local/include)
 		LF=$(pkg-config --libs protobuf 2>/dev/null || echo "-L/usr/local/lib -lprotobuf")
