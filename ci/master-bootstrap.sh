@@ -82,30 +82,26 @@ if [ "${PBMAJ:-0}" -lt 30 ]; then
 			# で落ちる。pthread_np.h の pthread_getthreadid_np を
 			# 使う形に直す。FreeBSD の枝をそのまま広げるだけである。
 			if [ "$(uname -s)" = DragonFly ]; then
+				# abseil は DragonFly を知らないので GetTID が
+				# fallback へ落ち、pthread_t (ここでは pointer) を
+				# pid_t へ static_cast しようとして落ちる。
+				#
+				#	sysinfo.cc:484:10: error: static_cast from
+				#	  'pthread_t' (aka '__pthread_s *') to 'pid_t'
+				#
+				# 枝を足すより fallback の中身を差し替える方が、
+				# 版が動いても効く。pthread_getthreadid_np() は
+				# LWP の id を返す。
 				F=$PB/absl/absl/base/internal/sysinfo.cc
-				sed -i.bak -e 's|^#ifdef __FreeBSD__$|#if defined(__FreeBSD__) \|\| defined(__DragonFly__)|' "$F"
-				# GetTID の fallback の手前に DragonFly の枝を挿す。
-				python3 - "$F" <<'ABSLPY'
-import sys
-p = sys.argv[1]
-s = open(p, encoding="utf-8").read()
-mark = "#else\n\n// Fallback implementation of `GetTID` using `pthread_self`."
-add = ("""#elif defined(__DragonFly__)
-
-// DragonFly's pthread_t is a pointer, so the fallback below cannot cast it.
-// pthread_getthreadid_np() gives the LWP id.
-pid_t GetTID() { return static_cast<pid_t>(pthread_getthreadid_np()); }
-
-""" + mark)
-if "__DragonFly__" in s and "pthread_getthreadid_np" in s:
-    print("  abseil: 既に当たっている")
-elif mark in s:
-    open(p, "w", encoding="utf-8").write(s.replace(mark, add, 1))
-    print("  abseil: DragonFly の GetTID を入れた")
-else:
-    print("  abseil: 当てる場所が見つからない")
-    sys.exit(1)
-ABSLPY
+				sed -i.bak \
+				  -e 's|^#ifdef __FreeBSD__$|#if defined(__FreeBSD__) \|\| defined(__DragonFly__)|' \
+				  -e 's|static_cast<pid_t>(pthread_self())|static_cast<pid_t>(pthread_getthreadid_np())|' \
+				  "$F"
+				grep -q "pthread_getthreadid_np" "$F" ||
+					{ echo "  abseil の書き換えが当たっていない"; exit 1; }
+				grep -q "defined(__DragonFly__)" "$F" ||
+					{ echo "  pthread_np.h の枝が当たっていない"; exit 1; }
+				echo "  abseil: DragonFly 向けに GetTID を差し替えた"
 			fi
 			mkdir -p "$PB/absl/b" && cd "$PB/absl/b"
 			cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release \
