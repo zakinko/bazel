@@ -484,8 +484,27 @@ if [ -n "$APU" ]; then
 		echo "取れない: $APU"
 fi
 
+# protobuf の生成 code は class の初期化で runtime の版を検査する。
+#
+#	com.google.protobuf.RuntimeVersion$ProtobufRuntimeVersionException
+#
+# Java を生成したのは箱の protoc で、maven_install.json の protobuf-java は
+# それより古いことがある (OpenBSD は protoc 34.1、json は 4.33.2)。dist archive
+# は生成済みの Java を持つのでこの検査を通る。生成側に合わせる。
+PROTOCV=$("$PROTOC" --version | awk '{print $2}')
+case $PROTOCV in
+[0-9]*) PBV=4.$PROTOCV ;;
+esac
+echo "  protoc $PROTOCV に合わせて protobuf-java $PBV を使う"
+find "$SRC/derived/maven" -path '*/com/google/protobuf/*' -name '*.jar' -delete 2>/dev/null
+for a in protobuf-java protobuf-java-util; do
+	u="https://repo1.maven.org/maven2/com/google/protobuf/$a/$PBV/$a-$PBV.jar"
+	[ -s "$SRC/derived/maven/extra/$a-$PBV.jar" ] ||
+		curl -sfL -o "$SRC/derived/maven/extra/$a-$PBV.jar" "$u" ||
+		{ echo "取れない: $u"; exit 1; }
+done
+
 for u in \
-  "https://repo1.maven.org/maven2/com/google/protobuf/protobuf-java-util/$PBV/protobuf-java-util-$PBV.jar" \
   "https://repo1.maven.org/maven2/com/github/luben/zstd-jni/$ZSV/zstd-jni-$ZSV.jar"; do
 	f=$(basename "$u")
 	[ -s "$SRC/derived/maven/extra/$f" ] ||
