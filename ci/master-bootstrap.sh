@@ -137,6 +137,28 @@ else:
     print("  vdso_support.cc: 当てる場所が見つからない")
     sys.exit(1)
 VDSO
+				# cctz の time_zone_format.cc が _XOPEN_SOURCE 500 を
+				# 立てる。DragonFly の base の libstdc++ はそれで
+				# vfwscanf / isblank / wcstof を隠す。FreeBSD と
+				# OpenBSD は既に除外されているので、そこへ足す。
+				T=$PB/absl/absl/time/internal/cctz/src/time_zone_format.cc
+				python3 - "$T" <<'TZF'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="utf-8").read()
+old = "#if !defined(_XOPEN_SOURCE) && !defined(__FreeBSD__) && !defined(__OpenBSD__)"
+new = old + " && \\\n    !defined(__DragonFly__)"
+if "__DragonFly__" in s:
+    print("  time_zone_format.cc: 既に当たっている")
+elif old in s:
+    open(p, "w", encoding="utf-8").write(s.replace(old, new, 1))
+    print("  time_zone_format.cc: DragonFly を除外に足した")
+else:
+    print("  time_zone_format.cc: 当てる場所が見つからない")
+    sys.exit(1)
+TZF
+				grep -q "__DragonFly__" "$T" ||
+					{ echo "time_zone_format.cc の書き換えが当たっていない"; exit 1; }
 				C=$PB/absl/absl/base/config.h
 				sed -i.bak \
 				  -e 's|defined(__XTENSA__)$|defined(__XTENSA__) \|\| defined(__DragonFly__)|' \
