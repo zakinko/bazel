@@ -260,7 +260,13 @@ echo "EXTRA_BAZEL_ARGS=$EXTRA_BAZEL_ARGS"
 # 渡されているので、その下に置けば compile.sh を触らずに済む。
 echo "=== googleapis の proto を置く"
 GAPI=$SRC/third_party/remoteapis/google
-B=https://raw.githubusercontent.com/googleapis/googleapis/master/google
+# googleapis は MODULE.bazel が commit で固定している。master から取ると
+# 版が食い違う。BCR の source.json が指す commit を使う。
+GAC=$(sed -n 's/.*name = "googleapis", version = "0\.0\.0-[0-9]*-\([0-9a-f]*\)".*/\1/p' \
+	"$SRC/MODULE.bazel" | head -1)
+GAC=${GAC:-de157ca34fa487ce248eb9130293d630b501e4ad}
+echo "  googleapis の commit: $GAC"
+B=https://raw.githubusercontent.com/googleapis/googleapis/$GAC/google
 if [ ! -f "$GAPI/rpc/status.proto" ]; then
 	mkdir -p "$GAPI/api" "$GAPI/rpc" "$GAPI/longrunning" "$GAPI/bytestream"
 	for f in api/annotations.proto api/http.proto api/client.proto \
@@ -396,6 +402,37 @@ if [ ! -f "$GAPI/devtools/build/v1/build_events.proto" ]; then
 		curl -sfL -o "$GAPI/devtools/build/v1/$f" \
 			"$B/devtools/build/v1/$f" || { echo "$f を取れない"; exit 1; }
 	done
+	# bazel は取り込んだ googleapis に自前の patch を当てている。proto にも
+	# 手を入れていて、stream_metadata がそれで足されている。当てないと
+	#
+	#	BuildEventServiceProtoUtil.java:183: error: cannot find symbol
+	#	  method addAllStreamMetadata(ImmutableList<Any>)
+	#
+	# になる。BUILD.bazel の hunk はこちらの置き方に合わないので、proto の
+	# 分だけ取り出して当てる。
+	python3 - "$SRC/third_party/googleapis.patch" \
+		"$GAPI/devtools/build/v1" <<'GAPATCH'
+import re, subprocess, sys, os
+patch, dest = sys.argv[1], sys.argv[2]
+text = open(patch, encoding="utf-8").read()
+# proto を触る diff だけ残す
+keep, cur = [], None
+for block in re.split(r"(?m)^(?=diff --git )", text):
+    if block.startswith("diff --git") and ".proto b/" in block.split("\n")[0]:
+        keep.append(block)
+if not keep:
+    print("  proto を触る hunk が無い")
+    sys.exit(0)
+sub = "".join(keep)
+# a/google/devtools/... を置き場に合わせる
+sub = sub.replace("a/google/devtools/build/v1/", "a/").replace(
+      "b/google/devtools/build/v1/", "b/")
+open("/tmp/gapi.patch", "w", encoding="utf-8").write(sub)
+r = subprocess.run(["patch", "-p1", "-s", "-i", "/tmp/gapi.patch"], cwd=dest)
+print("  googleapis の patch:", "当てた" if r.returncode == 0 else "当たらなかった")
+GAPATCH
+	grep -q stream_metadata "$GAPI/devtools/build/v1/publish_build_event.proto" ||
+		{ echo "stream_metadata が入らなかった"; exit 1; }
 fi
 
 # master の Java の source は無名変数 (Java 22) を使っている箇所がある。
