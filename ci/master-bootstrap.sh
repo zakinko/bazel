@@ -219,11 +219,13 @@ TZF
 	#	undefined reference to `utf8_range_IsValid'
 	#	undefined reference to `utf8_range_ValidPrefix'
 	#
-	# 名前は版で変わる (utf8_validity / utf8_range)。在るものを拾う。
+	# 名前は版で変わる (utf8_validity / utf8_range) し、置き場も b/ 直下では
+	# なく third_party/utf8_range/ の下である。find で拾う。upb も同じ。
 	PB_LIB="$PB/protobuf/b/libprotoc.a $PB/protobuf/b/libprotobuf.a"
-	for extra in $(ls "$PB"/protobuf/b/libutf8_*.a 2>/dev/null); do
+	for extra in $(find "$PB/protobuf/b" -name 'libutf8_*.a' -o -name 'libupb.a' 2>/dev/null | sort); do
 		PB_LIB="$PB_LIB $extra"
 	done
+	echo "  静的 library: $PB_LIB"
 	# AP は上の if の中でしか立たない。protoc が既に在って建て直しを
 	# 飛ばしたときは未定義になり、set -u で落ちる。
 	PB_ABSL=$PB/absl-prefix
