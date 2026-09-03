@@ -29,18 +29,10 @@ PROTOC=${PROTOC:-$(command -v protoc || true)}
 [ -x "$PROTOC" ] || { echo "protoc が無い。package を入れる"; exit 1; }
 "$PROTOC" --version
 
-# 建てる版は 31.1 にする。protobuf は MODULE.bazel で abseil の版を指していて
-#
-#	34.1 → abseil 20250512.1
-#	31.1 → abseil 20250127.0   ← DragonFly の package はこれ
-#
-# 合わない版を組むと、link 行に 92 本の libabsl を全部並べても
-#
-#	undefined reference to
-#	  absl::lts_20250127::log_internal::LogMessage::operator<<<int>
-#
-# が残る。記号が library に無いのだから、繋ぎ方の問題ではない。31.1 は 30 以上
-# なので java::QualifiedClassName を持ち、EDITION_2024 も知っている。
+# 建てる版は 34.1。grpc-java の HEAD が呼ぶ java::QualifiedClassName が
+# compiler/java/names.h に現れるのは 33.1 からで、31.1 にも 32.1 にも無い。
+# abseil は protobuf の MODULE.bazel が指す版を source から入れるので、
+# package の版に引きずられない。
 #
 # protobuf が 30 より古いと二つ足りない。grpc-java の HEAD が呼ぶ
 # java::QualifiedClassName が無く、libprotoc が java::ClassName を export
@@ -49,12 +41,12 @@ PROTOC=${PROTOC:-$(command -v protoc || true)}
 # 関わらず記号が取れる。
 PBMAJ=$("$PROTOC" --version | awk '{print $2}' | cut -d. -f1)
 if [ "${PBMAJ:-0}" -lt 30 ]; then
-	echo "=== protobuf $PBMAJ は古い。${PB_VER:-31.1} を source から組む"
+	echo "=== protobuf $PBMAJ は古い。${PB_VER:-34.1} を source から組む"
 	PB=$W/pbsrc
 	if [ ! -f "$PB/protobuf/b/protoc" ]; then
 		mkdir -p "$PB" && cd "$PB"
 		rm -rf protobuf
-		git clone -q --depth 1 -b "v${PB_VER:-31.1}" \
+		git clone -q --depth 1 -b "v${PB_VER:-34.1}" \
 			https://github.com/protocolbuffers/protobuf.git protobuf
 		mkdir -p protobuf/b && cd protobuf/b
 		# protobuf の cmake は absl を find_package で引くが、protoc の
@@ -89,11 +81,31 @@ if [ "${PBMAJ:-0}" -lt 30 ]; then
 			#
 			# で落ちる。pthread_np.h の pthread_getthreadid_np を
 			# 使う形に直す。FreeBSD の枝をそのまま広げるだけである。
-			if [ "$(uname -s)" = DragonFly ] &&
-			   [ -f "$BZ/ci/abseil_dragonfly.patch" ]; then
-				(cd "$PB/absl" &&
-				 patch -p1 -s -i "$BZ/ci/abseil_dragonfly.patch") ||
-					echo "  abseil の当て物が当たらない"
+			if [ "$(uname -s)" = DragonFly ]; then
+				F=$PB/absl/absl/base/internal/sysinfo.cc
+				sed -i.bak -e 's|^#ifdef __FreeBSD__$|#if defined(__FreeBSD__) \|\| defined(__DragonFly__)|' "$F"
+				# GetTID の fallback の手前に DragonFly の枝を挿す。
+				python3 - "$F" <<'ABSLPY'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="utf-8").read()
+mark = "#else\n\n// Fallback implementation of `GetTID` using `pthread_self`."
+add = ("""#elif defined(__DragonFly__)
+
+// DragonFly's pthread_t is a pointer, so the fallback below cannot cast it.
+// pthread_getthreadid_np() gives the LWP id.
+pid_t GetTID() { return static_cast<pid_t>(pthread_getthreadid_np()); }
+
+""" + mark)
+if "__DragonFly__" in s and "pthread_getthreadid_np" in s:
+    print("  abseil: 既に当たっている")
+elif mark in s:
+    open(p, "w", encoding="utf-8").write(s.replace(mark, add, 1))
+    print("  abseil: DragonFly の GetTID を入れた")
+else:
+    print("  abseil: 当てる場所が見つからない")
+    sys.exit(1)
+ABSLPY
 			fi
 			mkdir -p "$PB/absl/b" && cd "$PB/absl/b"
 			cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release \
@@ -506,6 +518,16 @@ if [ "$JAVA_VER" -lt 22 ]; then
 		grep -rnE 'var _ =|(^|[(, \t])_ ->' src/main/java --include='*.java' | head -5
 	fi
 fi
+
+# compile.sh の第二段は derived/maven を @maven の vendored repo として扱い、
+#
+#	cp derived/maven/BUILD.vendor derived/maven/BUILD
+#
+# を打つ。BUILD.vendor は dist archive にしか無く、rules_jvm_external が
+# 生成するものである。compile.sh 単体では --override_repository を渡さないので
+# (それは bootstrap.sh の側)、空で置いておけば cp が通り、第二段は @maven を
+# 網から取る。
+[ -f "$SRC/derived/maven/BUILD.vendor" ] || : > "$SRC/derived/maven/BUILD.vendor"
 
 echo "=== 起こす"
 PROTOC="$PROTOC" GRPC_JAVA_PLUGIN="$PLUGIN" "${BAZEL_SH:-bash}" ./compile.sh
