@@ -615,6 +615,40 @@ JNIPY
 	;;
 esac
 
+# src/main/native/unix_jni_bsd.cc は FreeBSD と OpenBSD しか知らず、他は
+#
+#	unix_jni_bsd.cc:21:3: error: #error This BSD is not supported
+#
+# で止まる。NetBSD には extattr も sysctlbyname も無いので OpenBSD と同じ
+# 扱いでよい。DragonFly は FreeBSD と同じで両方在る。
+case "$(uname -s)" in
+NetBSD|DragonFly)
+	python3 - src/main/native/unix_jni_bsd.cc <<'UJB'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="utf-8").read()
+if "__NetBSD__" in s:
+    print("  unix_jni_bsd.cc: 既に当たっている")
+    sys.exit(0)
+old = ("#if defined(__FreeBSD__)\n"
+       "# define HAVE_EXTATTR\n"
+       "# define HAVE_SYSCTLBYNAME\n"
+       "#elif defined(__OpenBSD__)\n")
+new = ("#if defined(__FreeBSD__) || defined(__DragonFly__)\n"
+       "# define HAVE_EXTATTR\n"
+       "# define HAVE_SYSCTLBYNAME\n"
+       "#elif defined(__OpenBSD__) || defined(__NetBSD__)\n")
+if old not in s:
+    print("  unix_jni_bsd.cc: 当てる場所が見つからない")
+    sys.exit(1)
+open(p, "w", encoding="utf-8").write(s.replace(old, new, 1))
+print("  unix_jni_bsd.cc: NetBSD と DragonFly を足した")
+UJB
+	grep -q "__NetBSD__" src/main/native/unix_jni_bsd.cc ||
+		{ echo "unix_jni_bsd.cc の書き換えが当たっていない"; exit 1; }
+	;;
+esac
+
 # src/main/native/unix_jni.h は stat64 を持たない platform を
 # __APPLE__ / __FreeBSD__ / __OpenBSD__ の三つしか挙げていない。NetBSD にも
 # DragonFly にも stat64 は無いので、そちらは stat64 の枝に落ちて
@@ -650,9 +684,11 @@ esac
 # buildenv.sh の atexit が一時 directory を消すので、途中で落ちると何も
 # 残らない。KEEP_TMP=1 のときは消さない。
 if [ -n "${KEEP_TMP:-}" ]; then
-	sed -i.bak 's|^\( *\)rm -rf "${NEW_TMPDIR}"|\1: keep "${NEW_TMPDIR}"|' \
+	sed -i.bak 's|{ rm -rf .\${DIR}. >&/dev/null|{ : keep |' \
 		scripts/bootstrap/buildenv.sh
-	grep -n "keep \"\${NEW_TMPDIR}\"" scripts/bootstrap/buildenv.sh | head -2
+	grep -q "{ : keep " scripts/bootstrap/buildenv.sh ||
+		{ echo "KEEP_TMP の書き換えが当たっていない"; exit 1; }
+	echo "  一時 directory を残す"
 fi
 
 echo "=== 起こす"
