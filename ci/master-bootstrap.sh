@@ -29,6 +29,19 @@ PROTOC=${PROTOC:-$(command -v protoc || true)}
 [ -x "$PROTOC" ] || { echo "protoc が無い。package を入れる"; exit 1; }
 "$PROTOC" --version
 
+# 建てる版は 31.1 にする。protobuf は MODULE.bazel で abseil の版を指していて
+#
+#	34.1 → abseil 20250512.1
+#	31.1 → abseil 20250127.0   ← DragonFly の package はこれ
+#
+# 合わない版を組むと、link 行に 92 本の libabsl を全部並べても
+#
+#	undefined reference to
+#	  absl::lts_20250127::log_internal::LogMessage::operator<<<int>
+#
+# が残る。記号が library に無いのだから、繋ぎ方の問題ではない。31.1 は 30 以上
+# なので java::QualifiedClassName を持ち、EDITION_2024 も知っている。
+#
 # protobuf が 30 より古いと二つ足りない。grpc-java の HEAD が呼ぶ
 # java::QualifiedClassName が無く、libprotoc が java::ClassName を export
 # もしていない (header には在るのに .so に出ていない)。DragonFly の dports は
@@ -36,12 +49,12 @@ PROTOC=${PROTOC:-$(command -v protoc || true)}
 # 関わらず記号が取れる。
 PBMAJ=$("$PROTOC" --version | awk '{print $2}' | cut -d. -f1)
 if [ "${PBMAJ:-0}" -lt 30 ]; then
-	echo "=== protobuf $PBMAJ は古い。${PB_VER:-34.1} を source から組む"
+	echo "=== protobuf $PBMAJ は古い。${PB_VER:-31.1} を source から組む"
 	PB=$W/pbsrc
 	if [ ! -f "$PB/protobuf/b/protoc" ]; then
 		mkdir -p "$PB" && cd "$PB"
 		rm -rf protobuf
-		git clone -q --depth 1 -b "v${PB_VER:-34.1}" \
+		git clone -q --depth 1 -b "v${PB_VER:-31.1}" \
 			https://github.com/protocolbuffers/protobuf.git protobuf
 		mkdir -p protobuf/b && cd protobuf/b
 		# protobuf の cmake は absl を find_package で引くが、protoc の
@@ -366,6 +379,9 @@ ls "$SRC/derived/maven/extra" | wc -l
 # 出来ず、package ... does not exist で落ちる。find の対象を足す。
 ADD="src/main/java/com/google/devtools/build/lib/skyframe/serialization/analysis/proto"
 ADD="$ADD src/main/java/com/google/devtools/build/lib/sandbox/cgroups/proto"
+# packages/metrics は package_load_metrics.proto だけが名指しされていて、
+# 同じ場所の package_metrics.proto が漏れている。置き場ごと足す。
+ADD="$ADD src/main/java/com/google/devtools/build/lib/packages/metrics"
 sed -i.bak "s|^PROTO_FILES=\$(find third_party/remoteapis|PROTO_FILES=\$(find $ADD third_party/remoteapis|" \
 	scripts/bootstrap/compile.sh
 grep -q "cgroups/proto .*third_party" scripts/bootstrap/compile.sh ||
@@ -395,17 +411,17 @@ fi
 if [ "$JAVA_VER" -lt 22 ]; then
 	echo "=== 無名変数を JDK $JAVA_VER 向けに直す"
 	n=0
-	for f in $(grep -rl -E 'var _ =|_ ->|\(_\)' src/main/java --include='*.java' 2>/dev/null); do
-		sed -i.bak -e 's|var _ =|var unused_ =|g' \
-			   -e 's|(_ ->|(unused_ ->|g' \
-			   -e 's|, _ ->|, unused_ ->|g' "$f"
+	for f in $(grep -rlE 'var _ =|_ ->' src/main/java --include='*.java' 2>/dev/null); do
+		# 行頭に来る形もあるので、区切りをまとめて見る。
+		sed -i.bak -E -e 's/var _ =/var unused_ =/g' \
+			      -e 's/(^|[(, \t])_ ->/\1unused_ ->/g' "$f"
 		rm -f "$f.bak"
 		n=$((n+1))
 	done
 	echo "  $n file を直した"
-	if grep -rq -E 'var _ =|\(_ ->' src/main/java --include='*.java' 2>/dev/null; then
+	if grep -rqE 'var _ =|(^|[(, \t])_ ->' src/main/java --include='*.java' 2>/dev/null; then
 		echo "  まだ残っている:"
-		grep -rn -E 'var _ =|\(_ ->' src/main/java --include='*.java' | head -5
+		grep -rnE 'var _ =|(^|[(, \t])_ ->' src/main/java --include='*.java' | head -5
 	fi
 fi
 
