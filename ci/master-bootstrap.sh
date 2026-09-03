@@ -42,6 +42,10 @@ PROTOC=${PROTOC:-$(command -v protoc || true)}
 PBMAJ=$("$PROTOC" --version | awk '{print $2}' | cut -d. -f1)
 if [ "${PBMAJ:-0}" -lt 30 ]; then
 	echo "=== protobuf $PBMAJ は古い。${PB_VER:-34.1} を source から組む"
+	for t in cmake ninja; do
+		command -v $t >/dev/null 2>&1 ||
+			{ echo "$t が無い。package を入れる (pkg install -y cmake ninja)"; exit 1; }
+	done
 	PB=$W/pbsrc
 	if [ ! -f "$PB/protobuf/b/protoc" ]; then
 		mkdir -p "$PB" && cd "$PB"
