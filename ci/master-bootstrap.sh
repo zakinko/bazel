@@ -597,9 +597,22 @@ esac
 # になる。三つの列挙に足すだけである。
 case "$(uname -s)" in
 NetBSD|DragonFly)
-	sed -i.bak \
-	  's|^#if defined(__APPLE__) \|\| defined(__FreeBSD__) \|\| defined(__OpenBSD__)$|#if defined(__APPLE__) \|\| defined(__FreeBSD__) \|\| defined(__OpenBSD__) \|\| \\\n    defined(__NetBSD__) \|\| defined(__DragonFly__)|' \
-	  src/main/native/unix_jni.h
+	# sed の多行置換はここでは当たらなかった。python で書き換える。
+	python3 - src/main/native/unix_jni.h <<'JNIH'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="utf-8").read()
+old = "#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)"
+new = old + " || \\\n    defined(__NetBSD__) || defined(__DragonFly__)"
+if "__NetBSD__" in s:
+    print("  unix_jni.h: 既に当たっている")
+elif old in s:
+    open(p, "w", encoding="utf-8").write(s.replace(old, new, 1))
+    print("  unix_jni.h: NetBSD と DragonFly を足した")
+else:
+    print("  unix_jni.h: 当てる場所が見つからない")
+    sys.exit(1)
+JNIH
 	grep -q "__NetBSD__" src/main/native/unix_jni.h ||
 		{ echo "unix_jni.h の書き換えが当たっていない"; exit 1; }
 	echo "=== unix_jni.h に NetBSD と DragonFly を足した"
