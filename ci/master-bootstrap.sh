@@ -619,6 +619,14 @@ JNIH
 	;;
 esac
 
+# buildenv.sh の atexit が一時 directory を消すので、途中で落ちると何も
+# 残らない。KEEP_TMP=1 のときは消さない。
+if [ -n "${KEEP_TMP:-}" ]; then
+	sed -i.bak 's|^\( *\)rm -rf "${NEW_TMPDIR}"|\1: keep "${NEW_TMPDIR}"|' \
+		scripts/bootstrap/buildenv.sh
+	grep -n "keep \"\${NEW_TMPDIR}\"" scripts/bootstrap/buildenv.sh | head -2
+fi
+
 echo "=== 起こす"
 PROTOC="$PROTOC" GRPC_JAVA_PLUGIN="$PLUGIN" "${BAZEL_SH:-bash}" ./compile.sh
 ./output/bazel --version
