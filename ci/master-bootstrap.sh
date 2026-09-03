@@ -148,10 +148,24 @@ VDSO
 			mkdir -p "$PB/absl/b" && cd "$PB/absl/b"
 			# DragonFly の base の libstdc++ は -std=c++17 だと
 			# __STRICT_ANSI__ が立って isblank や wcstof を隠す。
-			# CXX_EXTENSIONS=ON なら gnu++17 になる。
+			# CMAKE_CXX_EXTENSIONS=ON は UNINITIALIZED 扱いになって
+			# 効かなかった (abseil が target ごとに決めている)。
+			# 最後に -std=gnu++17 を足す包みを CXX にすれば、cmake が
+			# 何を並べても後ろのものが勝つ。
+			if [ "$(uname -s)" = DragonFly ]; then
+				mkdir -p "$PB/bin"
+				# 実体の path は焼き込む。環境変数に頼ると
+				# ninja が別の環境で呼んだときに外れる。
+				printf '#!/bin/sh\nexec %s "$@" -std=gnu++17\n' \
+					"${CXX:-clang++}" > "$PB/bin/cxx-gnu17"
+				chmod 755 "$PB/bin/cxx-gnu17"
+				CMCXX="$PB/bin/cxx-gnu17"
+			else
+				CMCXX=${CXX:-c++}
+			fi
 			cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release \
+				-DCMAKE_CXX_COMPILER="$CMCXX" \
 				-DCMAKE_CXX_STANDARD=17 \
-				-DCMAKE_CXX_EXTENSIONS=ON \
 				-DABSL_PROPAGATE_CXX_STD=ON \
 				-DBUILD_TESTING=OFF \
 				-DCMAKE_POSITION_INDEPENDENT_CODE=ON \
@@ -166,8 +180,8 @@ VDSO
 		ABSLALL=""
 		cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release \
 			-DCMAKE_PREFIX_PATH="$AP" \
+			-DCMAKE_CXX_COMPILER="${CMCXX:-${CXX:-c++}}" \
 			-DCMAKE_CXX_STANDARD=17 \
-			-DCMAKE_CXX_EXTENSIONS=ON \
 			-Dprotobuf_BUILD_TESTS=OFF \
 			-Dprotobuf_BUILD_SHARED_LIBS=OFF \
 			-Dprotobuf_ABSL_PROVIDER=package \
