@@ -1,3 +1,22 @@
+diff -u -r a/python/private/BUILD.bazel b/python/private/BUILD.bazel
+--- a/python/private/BUILD.bazel
++++ b/python/private/BUILD.bazel
+@@ -746,6 +746,15 @@
+ )
+ 
+ exports_files(
++    ["runtime_env_toolchain_interpreter.sh"],
++    # bazel の scripts/bootstrap/bootstrap.sh が
++    #   --extra_toolchains=@rules_python//python/runtime_env_toolchains:all
++    # を渡すので、その target から見えている必要がある。package の
++    # default_visibility は source file の暗黙 export には効かない。
++    visibility = ["//visibility:public"],
++)
++
++exports_files(
+     ["python_bootstrap_template.txt"],
+     # Not actually public. Only public because it's an implicit dependency of
+     # py_runtime.
 diff -u -r a/python/private/runtime_env_toolchain_interpreter.sh b/python/private/runtime_env_toolchain_interpreter.sh
 --- a/python/private/runtime_env_toolchain_interpreter.sh
 +++ b/python/private/runtime_env_toolchain_interpreter.sh
