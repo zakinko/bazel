@@ -216,7 +216,20 @@ TZF
 		ninja -j"${JOBS:-2}" > build.log 2>&1 ||
 			{ tail -30 build.log; exit 1; }
 	fi
-	PROTOC=$PB/protobuf/b/protoc
+	# source から建てた protoc は well-known types の在処を知らない。
+	# package の protoc は自分の share/ を見るが、build 木の中の protoc は
+	# 見ないので
+	#
+	#	package_load_metrics.proto:18:1: Import
+	#	  "google/protobuf/duration.proto" was not found or had errors.
+	#
+	# になる。compile.sh の protoc の呼び方は決め打ちなので、-I を足す
+	# 包みを噛ませる。
+	mkdir -p "$PB/bin"
+	printf '#!/bin/sh\nexec %s -I%s "$@"\n' \
+		"$PB/protobuf/b/protoc" "$PB/protobuf/src" > "$PB/bin/protoc-wrap"
+	chmod 755 "$PB/bin/protoc-wrap"
+	PROTOC=$PB/bin/protoc-wrap
 	PB_INC="-I$PB/protobuf/src"
 	# libprotobuf は utf8_range を呼ぶが、静的に組むと自分では持たない。
 	#
