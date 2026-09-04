@@ -331,6 +331,42 @@ single_version_override(
 M
 fi
 
+# rules_go の detect_host_platform は ctx.os.name をそのまま GOOS にする。
+# DragonFly では "dragonflybsd" になり、//go/toolchain:dragonflybsd という
+# 在りもしない target を指す。go は //src:bazel_nojdk の中身には要らないが、
+# 登録された toolchain は解決の時に必ず読まれるので、ここで解析が止まる。
+if [ -f "$BZ/ci/rules_go_dragonfly_goos.patch" ]; then
+	mkdir -p toolchain_local
+	: > toolchain_local/BUILD
+	cp "$BZ/ci/rules_go_dragonfly_goos.patch" \
+		toolchain_local/rules_go_dragonfly_goos.patch
+	cat >> MODULE.bazel <<'M'
+
+single_version_override(
+    module_name = "rules_go",
+    patch_strip = 1,
+    patches = ["//toolchain_local:rules_go_dragonfly_goos.patch"],
+)
+M
+fi
+
+# MODULE.bazel の pip.parse は requirements.txt を hub へ展開するのに、評価の
+# 時点で 3.11 の interpreter を要る。rules_python が配る CPython に BSD 向けが
+# 無いので、
+#
+#	Error: Unable to find interpreter for pip hub 'bazel_pip_dev_deps'
+#	  for python_version=3.11
+#
+# で module extension ごと落ちる。@bazel_pip_dev_deps を引くのは
+# scripts/docs/BUILD, src/test/py/bazel/BUILD, src/test/tools/test_repos/BUILD
+# の三つだけで、//src:bazel_nojdk の graph には入っていない。踏み台を建てる
+# 間は要らないので落とす。
+python3 "$BZ/ci/drop_pip_dev_deps.py" MODULE.bazel
+if grep -q bazel_pip_dev_deps MODULE.bazel; then
+	echo "pip の塊が残っている"
+	exit 1
+fi
+
 # BUILD:345 が java_runtime に remotejdk_25 を名指ししている。remotejdk は
 # BSD 向けが配られていないので、ここで toolchain の解決が失敗する。
 # current_java_runtime は登録済みの runtime toolchain を引く alias。
