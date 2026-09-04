@@ -40,7 +40,7 @@ TAIL = 'use_repo(pip, "bazel_pip_dev_deps")'
 
 FROZENDICT = '''licenses(["notice"])
 
-# @bazel_pip_dev_deps から requirement() を load していたが、pip の hub は
+# ここは pip の hub から requirement() を load していたが、その hub は
 # BSD では組めない。alias を引くのは tools/ctexplain だけで、踏み台を建てる
 # graph の外に在る。srcs は third_party/BUILD から引かれるので残す。
 filegroup(
