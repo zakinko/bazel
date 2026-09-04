@@ -360,12 +360,13 @@ fi
 # で module extension ごと落ちる。alias や requirement() の中身を使うのは
 # scripts/docs, src/test/py/bazel, src/test/tools/test_repos, tools/ctexplain
 # だけで、どれも //src:bazel_nojdk の graph の外に在る。ただし
-# third_party/py/frozendict/BUILD は頭で requirement() を load していて、
-# その package は third_party/BUILD の srcs から引かれるので graph に入る。
+# third_party/py/ の下の BUILD は頭で requirement() を load していて、その
+# package は third_party/BUILD の srcs から引かれるので graph に入る (今は
+# frozendict と abseil の二つ)。
 # load は package を読む段階で走るので、誰も使わない repo の解決に build
 # 全体が引きずられる。踏み台を建てる間は要らないので、両方とも落とす。
 python3 "$BZ/ci/drop_pip_dev_deps.py" .
-if grep -rq bazel_pip_dev_deps MODULE.bazel third_party/py/frozendict/BUILD; then
+if grep -rq bazel_pip_dev_deps MODULE.bazel third_party/py; then
 	echo "pip の塊が残っている"
 	exit 1
 fi

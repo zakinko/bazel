@@ -33,22 +33,43 @@ srcs の filegroup だけ残して load と alias を落とす。
 """
 import io
 import os
+import re
 import sys
 
 HEAD = 'pip = use_extension("@rules_python//python/extensions:pip.bzl"'
 TAIL = 'use_repo(pip, "bazel_pip_dev_deps")'
 
-FROZENDICT = '''licenses(["notice"])
+HUB = "bazel_pip_dev_deps"
 
-# ここは pip の hub から requirement() を load していたが、その hub は
-# BSD では組めない。alias を引くのは tools/ctexplain だけで、踏み台を建てる
-# graph の外に在る。srcs は third_party/BUILD から引かれるので残す。
-filegroup(
-    name = "srcs",
-    srcs = glob(["**"]),
-    visibility = ["//visibility:public"],
-)
-'''
+
+def strip_hub(text):
+    """load の行と、requirement() を使う alias の塊だけを落とす。
+
+    filegroup(srcs) は third_party/BUILD の srcs から引かれるので残す。
+    """
+    out = []
+    lines = text.split("\n")
+    i = 0
+    while i < len(lines):
+        ln = lines[i]
+        if ln.startswith("load(") and HUB in ln:
+            i += 1
+            continue
+        if ln.startswith("alias("):
+            j = i
+            block = []
+            while j < len(lines):
+                block.append(lines[j])
+                if lines[j] == ")":
+                    break
+                j += 1
+            if any("requirement(" in b for b in block):
+                i = j + 1
+                continue
+        out.append(ln)
+        i += 1
+    # 頭と末尾に空行が溜まるので均す
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip() + "\n"
 
 
 def drop_pip(root):
@@ -68,23 +89,35 @@ def drop_pip(root):
     return 0
 
 
-def drop_frozendict(root):
-    p = os.path.join(root, "third_party/py/frozendict/BUILD")
-    if not os.path.exists(p):
-        print("  frozendict: BUILD が無い")
+def drop_third_party(root):
+    """third_party/py/*/BUILD が頭で hub から load している分を外す。"""
+    base = os.path.join(root, "third_party/py")
+    if not os.path.isdir(base):
+        print("  third_party/py が無い")
         return 0
-    s = io.open(p, encoding="utf-8").read()
-    if "bazel_pip_dev_deps" not in s:
-        print("  frozendict: 既に引いていない")
-        return 0
-    io.open(p, "w", encoding="utf-8").write(FROZENDICT)
-    print("  frozendict: load と alias を落とした")
+    hit = 0
+    for name in sorted(os.listdir(base)):
+        p = os.path.join(base, name, "BUILD")
+        if not os.path.exists(p):
+            continue
+        s = io.open(p, encoding="utf-8").read()
+        if HUB not in s:
+            continue
+        io.open(p, "w", encoding="utf-8").write(strip_hub(s))
+        left = io.open(p, encoding="utf-8").read()
+        if HUB in left:
+            print("  third_party/py/%s: 落としきれていない" % name)
+            return 1
+        print("  third_party/py/%s: load と alias を落とした" % name)
+        hit += 1
+    if not hit:
+        print("  third_party/py: 既に引いていない")
     return 0
 
 
 def main():
     root = sys.argv[1] if len(sys.argv) > 1 else "."
-    rc = drop_pip(root) or drop_frozendict(root)
+    rc = drop_pip(root) or drop_third_party(root)
     return rc
 
 
