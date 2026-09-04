@@ -361,8 +361,8 @@ fi
 # scripts/docs/BUILD, src/test/py/bazel/BUILD, src/test/tools/test_repos/BUILD
 # の三つだけで、//src:bazel_nojdk の graph には入っていない。踏み台を建てる
 # 間は要らないので落とす。
-python3 "$BZ/ci/drop_pip_dev_deps.py" MODULE.bazel
-if grep -q bazel_pip_dev_deps MODULE.bazel; then
+python3 "$BZ/ci/drop_pip_dev_deps.py" .
+if grep -rq bazel_pip_dev_deps MODULE.bazel third_party/py/frozendict/BUILD; then
 	echo "pip の塊が残っている"
 	exit 1
 fi
