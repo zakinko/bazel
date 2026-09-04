@@ -805,54 +805,25 @@ if [ ! -s "$BZR/builtins_bzl.zip" ]; then
 fi
 unzip -l "$BZR/builtins_bzl.zip" | tail -1
 
-# 第二段で建てた bazel は自分が何の OS か分からない。OS.java の列挙が
-# DARWIN / FREEBSD / OPENBSD / LINUX / WINDOWS / UNKNOWN しか持たないためで、
-# NetBSD と DragonFly は UNKNOWN に落ちる。その帰結が
+# OS の列挙に NetBSD と DragonFly を足す。OS.java だけでは足りない。値を
+# 列挙している場所が八箇所あって、そこに入っていないと足す前より悪くなる。
+# JniLoader がその例で、
 #
-#	bazel-out/unknown-opt/...
-#	Cannot run program "/bin/bash" ... error: 2 (No such file or directory)
+#	case LINUX, FREEBSD, OPENBSD, UNKNOWN -> loadLibrary(libunix_jni.so)
 #
-# で、SHELL_EXECUTABLES が UNKNOWN に対して /bin/bash を返すからである。
-# NetBSD の bash は pkgsrc なので /usr/pkg/bin、DragonFly は /usr/local/bin。
+# と書いてある。NetBSD は足す前は UNKNOWN として .so を読めていたのに、
+# OS.NETBSD を足した途端どの case にも当たらず、何も読まなくなって
+#
+#	java.lang.UnsatisfiedLinkError:
+#	  ...NativePosixFilesServiceImpl.readdir(java.lang.String)
+#
+# で落ちた。.so には記号が在り jar にも入っていて ldd も通るので、症状と実体が
+# 食い違って見える。ci/os_enum_sites.py が八箇所を一度に当てる。
 case "$(uname -s)" in
 NetBSD|DragonFly)
-	python3 - "$SRC" <<'OSPY'
-import sys, os
-root = sys.argv[1]
-
-p = os.path.join(root, "src/main/java/com/google/devtools/build/lib/util/OS.java")
-s = open(p, encoding="utf-8").read()
-if "NETBSD" in s:
-    print("  OS.java: 既に当たっている")
-else:
-    old = '  OPENBSD("openbsd", "OpenBSD"),\n'
-    new = old + '  NETBSD("netbsd", "NetBSD"),\n  DRAGONFLY("dragonfly", "DragonFly"),\n'
-    if old not in s:
-        print("  OS.java: 当てる場所が見つからない"); sys.exit(1)
-    s = s.replace(old, new, 1)
-    o2 = "EnumSet.of(DARWIN, FREEBSD, OPENBSD, LINUX)"
-    n2 = "EnumSet.of(DARWIN, FREEBSD, OPENBSD, NETBSD, DRAGONFLY, LINUX)"
-    if o2 not in s:
-        print("  OS.java: POSIX_COMPATIBLE が見つからない"); sys.exit(1)
-    open(p, "w", encoding="utf-8").write(s.replace(o2, n2, 1))
-    print("  OS.java: NETBSD と DRAGONFLY を足した")
-
-p = os.path.join(root, "src/main/java/com/google/devtools/build/lib/bazel/rules/BazelRuleClassProvider.java")
-s = open(p, encoding="utf-8").read()
-if "OS.NETBSD" in s:
-    print("  SHELL_EXECUTABLES: 既に当たっている")
-else:
-    old = '          .put(OS.OPENBSD, PathFragment.create("/usr/local/bin/bash"))\n'
-    new = (old +
-           '          .put(OS.NETBSD, PathFragment.create("/usr/pkg/bin/bash"))\n'
-           '          .put(OS.DRAGONFLY, PathFragment.create("/usr/local/bin/bash"))\n')
-    if old not in s:
-        print("  SHELL_EXECUTABLES: 当てる場所が見つからない"); sys.exit(1)
-    open(p, "w", encoding="utf-8").write(s.replace(old, new, 1))
-    print("  SHELL_EXECUTABLES: NetBSD と DragonFly を足した")
-OSPY
-	grep -q "NETBSD" src/main/java/com/google/devtools/build/lib/util/OS.java ||
-		{ echo "OS.java の書き換えが当たっていない"; exit 1; }
+	echo "=== OS の列挙に NetBSD と DragonFly を足す"
+	python3 "$BZ/ci/os_enum_sites.py" "$SRC" ||
+		{ echo "OS の列挙の書き換えが当たっていない"; exit 1; }
 	;;
 esac
 
