@@ -102,6 +102,13 @@ SITES = [
         '    visibility = ["//visibility:public"],\n)\n',
     ),
     (
+        "src/BUILD",
+        '        "//src/conditions:openbsd": ["md5_openbsd.sh"],\n',
+        '        "//src/conditions:openbsd": ["md5_openbsd.sh"],\n'
+        '        "//src/conditions:netbsd": ["md5_netbsd.sh"],\n'
+        '        "//src/conditions:dragonfly": ["md5_darwin_freebsd.sh"],\n',
+    ),
+    (
         "src/main/cpp/BUILD",
         '        "//src/conditions:openbsd": [\n        ],\n'
         '        "//src/conditions:windows": WIN_LINK_OPTS,\n',
@@ -271,6 +278,7 @@ VERIFY = [
     ("tools/jdk/BUILD.tools", ["jni_md_header-netbsd", "jni_md_header-dragonfly"]),
     ("third_party/BUILD", ["//src/conditions:netbsd", "//src/conditions:dragonfly"]),
     ("src/main/cpp/BUILD", ["//src/conditions:netbsd", "//src/conditions:dragonfly"]),
+    ("src/BUILD", ["md5_netbsd.sh", "md5_darwin_freebsd.sh"]),
     ("src/main/tools/BUILD",
      ["//src/conditions:netbsd", "//src/conditions:dragonfly"]),
     ("src/main/cpp/blaze_util_bsd.cc", ["__NetBSD__", "__DragonFly__"]),

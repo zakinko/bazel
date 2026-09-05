@@ -947,6 +947,20 @@ unzip -l "$BZR/builtins_bzl.zip" | tail -1
 case "$(uname -s)" in
 NetBSD|DragonFly)
 	echo "=== OS の列挙に NetBSD と DragonFly を足す"
+	# install_base_key を作る genrule は src/BUILD の sh_binary "md5" を使う。
+	# 既定は md5sum だが NetBSD にも DragonFly にも無いので genrule が空を
+	# 返し、install base の path が install/ 止まりになる。すると daemonize が
+	# そこに展開されず
+	#
+	#	FATAL: Failed to execute JVM via .../install/daemonize:
+	#	  (error: 2): No such file or directory
+	#
+	# で、建った bazel が起動できない。stage 2 は完走しているので、これは
+	# 建てる話ではなく起こす話である。DragonFly は /sbin/md5 で FreeBSD と
+	# 同じものを使えるが、NetBSD は /usr/bin/md5 なので script を一つ足す。
+	printf '/usr/bin/md5 "$@" | /usr/bin/md5 | head -c 32\n' \
+		> "$SRC/src/md5_netbsd.sh"
+	chmod 755 "$SRC/src/md5_netbsd.sh"
 	python3 "$BZ/ci/os_enum_sites.py" "$SRC" ||
 		{ echo "OS の列挙の書き換えが当たっていない"; exit 1; }
 	;;
