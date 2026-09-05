@@ -407,16 +407,19 @@ A="$A --java_language_version=$JAVA_VER --tool_java_language_version=$JAVA_VER"
 A="$A --extra_toolchains=@rules_python//python/runtime_env_toolchains:all"
 A="$A --host_linkopt=-lm --linkopt=-lm"
 
-# grpc-java を建てると ErrorProne の NullArgumentForNonNullParameter が
-# 立つ。
+# ErrorProne の NullArgumentForNonNullParameter が立つ。grpc-java でも
+# bazel 自身の net/starlark でも出る。
 #
 #	grpc-java+/api/src/main/java/io/grpc/CallOptions.java:532: error:
 #	  [NullArgumentForNonNullParameter] Null is not permitted for this
 #	  parameter.
 #
-# grpc-java 1.71.0 の側の問題で、こちらの移植とは関わりが無い。踏み台を
-# 建てる間は落とす。
+# bazel 自身の code が自分の check に引っかかっているので、これは
+# derived/maven で拾う error_prone の版が upstream の想定より新しいことに
+# よる。BSD への移植とは関わりが無い。踏み台を建てる間は落とす。
+# exec 構成でも建てるので --host_javacopt の方も要る。
 A="$A --javacopt=-Xep:NullArgumentForNonNullParameter:OFF"
+A="$A --host_javacopt=-Xep:NullArgumentForNonNullParameter:OFF"
 
 # rules_java が配る java_tools には singlejar の C++ が入っている。出来合いの
 # binary が在るのは linux/darwin/windows だけなので、BSD では source から

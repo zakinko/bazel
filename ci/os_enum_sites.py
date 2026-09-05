@@ -165,6 +165,13 @@ SITES = [
         "defined(__NetBSD__) || defined(__DragonFly__)",
     ),
     (
+        "src/main/native/BUILD",
+        '        "//src/conditions:openbsd": ["unix_jni_bsd.cc"],\n',
+        '        "//src/conditions:openbsd": ["unix_jni_bsd.cc"],\n'
+        '        "//src/conditions:netbsd": ["unix_jni_bsd.cc"],\n'
+        '        "//src/conditions:dragonfly": ["unix_jni_bsd.cc"],\n',
+    ),
+    (
         "src/main/cpp/BUILD",
         '        "//src/conditions:openbsd": [\n'
         '            "blaze_util_bsd.cc",\n'
@@ -231,7 +238,9 @@ SITES = [
 VERIFY = [
     ("src/conditions/BUILD", ['name = "netbsd"', 'name = "dragonfly"']),
     ("src/conditions/BUILD.tools", ['name = "netbsd"', 'name = "dragonfly"']),
-    ("src/main/native/BUILD", ["jni_md_header-netbsd", "jni_md_header-dragonfly"]),
+    ("src/main/native/BUILD",
+     ["jni_md_header-netbsd", "jni_md_header-dragonfly",
+      '"//src/conditions:netbsd": ["unix_jni_bsd.cc"]']),
     ("tools/jdk/BUILD.tools", ["jni_md_header-netbsd", "jni_md_header-dragonfly"]),
     ("third_party/BUILD", ["//src/conditions:netbsd", "//src/conditions:dragonfly"]),
     ("src/main/cpp/BUILD", ["//src/conditions:netbsd", "//src/conditions:dragonfly"]),
