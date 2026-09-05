@@ -112,6 +112,29 @@ SITES = [
         '    "//src/conditions:dragonfly": "*.so *.jnilib *.dll *.pyd",\n'
         '    "//src/conditions:openbsd": "*.so *.jnilib *.dll *.pyd",\n',
     ),
+    (
+        "src/tools/singlejar/diag.h",
+        "defined(__OpenBSD__)",
+        "defined(__OpenBSD__) || defined(__NetBSD__) || defined(__DragonFly__)",
+    ),
+    (
+        "src/tools/singlejar/port.h",
+        "#elif defined(__OpenBSD__)",
+        "#elif defined(__OpenBSD__) || defined(__NetBSD__) || "
+        "defined(__DragonFly__)",
+    ),
+    (
+        "src/tools/singlejar/mapped_file_posix.inc",
+        "defined(__OpenBSD__)) &&",
+        "defined(__OpenBSD__) || defined(__NetBSD__) || "
+        "defined(__DragonFly__)) &&",
+    ),
+    (
+        "src/tools/singlejar/zip_headers.h",
+        "#elif defined(__FreeBSD__) || defined(__OpenBSD__)",
+        "#elif defined(__FreeBSD__) || defined(__OpenBSD__) || "
+        "defined(__NetBSD__) || defined(__DragonFly__)",
+    ),
 ]
 
 

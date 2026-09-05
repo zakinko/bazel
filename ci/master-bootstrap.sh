@@ -393,6 +393,22 @@ A="$A --java_language_version=$JAVA_VER --tool_java_language_version=$JAVA_VER"
 # 使う toolchain を足す。
 A="$A --extra_toolchains=@rules_python//python/runtime_env_toolchains:all"
 A="$A --host_linkopt=-lm --linkopt=-lm"
+
+# rules_java が配る java_tools には singlejar の C++ が入っている。出来合いの
+# binary が在るのは linux/darwin/windows だけなので、BSD では source から
+# 建てることになり、そこの platform 判定で止まる。
+#
+#	diag.h:56:2: error: Unknown platform
+#
+# module ではないので single_version_override では当てられない。落として
+# 広げて差し替える。
+case "$(uname -s)" in
+NetBSD|DragonFly)
+	JT=$(python3 "$BZ/ci/patch_java_tools.py" "$W")
+	[ -d "$JT" ] || { echo "java_tools を用意できない"; exit 1; }
+	A="$A --override_repository=rules_java++toolchains+remote_java_tools=$JT"
+	;;
+esac
 A="$A --cxxopt=-std=gnu++17 --host_cxxopt=-std=gnu++17"
 
 # isascii が見えなくなるのは protobuf 自身の仕業である。
