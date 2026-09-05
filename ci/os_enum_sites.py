@@ -140,6 +140,14 @@ SITES = [
         '    "//src/conditions:openbsd": "*.so *.jnilib *.dll *.pyd",\n',
     ),
     (
+        "src/main/cpp/util/md5.h",
+        "#elif defined(__FreeBSD__) || defined(__OpenBSD__)\n"
+        "#include <sys/endian.h>\n",
+        "#elif defined(__FreeBSD__) || defined(__OpenBSD__) || "
+        "defined(__NetBSD__) || \\\n    defined(__DragonFly__)\n"
+        "#include <sys/endian.h>\n",
+    ),
+    (
         "src/tools/singlejar/diag.h",
         "defined(__OpenBSD__)",
         "defined(__OpenBSD__) || defined(__NetBSD__) || defined(__DragonFly__)",
@@ -228,6 +236,7 @@ VERIFY = [
     ("third_party/BUILD", ["//src/conditions:netbsd", "//src/conditions:dragonfly"]),
     ("src/main/cpp/BUILD", ["//src/conditions:netbsd", "//src/conditions:dragonfly"]),
     ("src/main/cpp/blaze_util_bsd.cc", ["__NetBSD__", "__DragonFly__"]),
+    ("src/main/cpp/util/md5.h", ["__NetBSD__", "__DragonFly__"]),
     ("src/tools/singlejar/diag.h", ["__NetBSD__", "__DragonFly__"]),
     ("src/tools/singlejar/mapped_file_posix.inc",
      ["__NetBSD__", "__DragonFly__"]),

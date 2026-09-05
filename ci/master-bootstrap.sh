@@ -328,8 +328,18 @@ gen() {	# gen <module> <os> <OV へ足す名前>
 
 case "$(uname -s)" in
 NetBSD)
+	# 二つ分を入れる。木の側は netbsd と dragonfly の両方の条件を書くので、
+	# 片方しか入れないと
+	#
+	#	no such target '@@platforms//os:dragonfly'
+	#	  target 'dragonfly' not declared in package 'os'
+	#
+	# で select の解決が落ちる。宣言だけ在って誰も選ばない、が正しい形。
 	gen platforms netbsd platforms_netbsd
+	gen platforms dragonfly platforms_dragonfly
 	gen rules_java netbsd rules_java_netbsd
+	gen rules_java dragonfly rules_java_dragonfly
+	gen zstd-jni dragonfly zstd_jni_dragonfly
 	# rules_go の当て物は入れない。NetBSD では ctx.os.name も GOOS も
 	# "netbsd" で綴りが同じなので goos の直しは要らず、Go SDK の方は
 	# 下の --repo_env=GOROOT で手元のものを使わせている。
@@ -343,9 +353,12 @@ NetBSD)
 	gen zstd-jni netbsd zstd_jni_netbsd
 	;;
 DragonFly)
+	gen platforms netbsd platforms_netbsd
 	gen platforms dragonfly platforms_dragonfly
+	gen rules_java netbsd rules_java_netbsd
 	gen rules_java dragonfly rules_java_dragonfly
 	gen rules_go dragonfly rules_go_dragonfly
+	gen zstd-jni netbsd zstd_jni_netbsd
 	gen zstd-jni dragonfly zstd_jni_dragonfly
 	gen c-ares dragonfly c_ares_dragonfly
 	# abseil の当て物は 20250814.1 に patch -p1 --dry-run で通ることを
