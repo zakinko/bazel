@@ -102,6 +102,13 @@ SITES = [
         '    visibility = ["//visibility:public"],\n)\n',
     ),
     (
+        "src/main/tools/BUILD",
+        '        "//src/conditions:openbsd": ["dummy-sandbox.c"],\n',
+        '        "//src/conditions:openbsd": ["dummy-sandbox.c"],\n'
+        '        "//src/conditions:netbsd": ["dummy-sandbox.c"],\n'
+        '        "//src/conditions:dragonfly": ["dummy-sandbox.c"],\n',
+    ),
+    (
         "src/main/native/BUILD",
         '        "//src/conditions:openbsd": '
         '"@rules_java//toolchains:jni_md_header-openbsd",\n',
@@ -244,6 +251,8 @@ VERIFY = [
     ("tools/jdk/BUILD.tools", ["jni_md_header-netbsd", "jni_md_header-dragonfly"]),
     ("third_party/BUILD", ["//src/conditions:netbsd", "//src/conditions:dragonfly"]),
     ("src/main/cpp/BUILD", ["//src/conditions:netbsd", "//src/conditions:dragonfly"]),
+    ("src/main/tools/BUILD",
+     ["//src/conditions:netbsd", "//src/conditions:dragonfly"]),
     ("src/main/cpp/blaze_util_bsd.cc", ["__NetBSD__", "__DragonFly__"]),
     ("src/main/cpp/util/md5.h", ["__NetBSD__", "__DragonFly__"]),
     ("src/tools/singlejar/diag.h", ["__NetBSD__", "__DragonFly__"]),

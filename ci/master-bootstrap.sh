@@ -286,6 +286,21 @@ if [ ! -x "$PLUGIN" ]; then
 fi
 ls -l "$PLUGIN"
 
+# bazel の output base は TMPDIR の下に出来る。DragonFly の image は /tmp が
+# 3.9G の tmpfs で、root に 284G 空いていてもそちらは使われない。
+#
+#	ftruncate(): No space left on device
+#
+# 溢れると出るのはこれだけで、disk が原因だとは言ってくれない。空きが
+# 20G に満たない TMPDIR は使わず、作業場所の下へ移す。
+free=$(df -k "${TMPDIR:-/tmp}" 2>/dev/null | awk 'NR==2 {print int($4/1024/1024)}')
+if [ -z "$free" ] || [ "$free" -lt 20 ]; then
+	TMPDIR=$W/tmp
+	mkdir -p "$TMPDIR"
+	export TMPDIR
+	echo "  TMPDIR を $TMPDIR へ移した (元の空きは ${free:-?}G)"
+fi
+
 echo "=== master を取る"
 rm -rf "$SRC"
 git clone -q --depth 1 https://github.com/bazelbuild/bazel.git "$SRC"
