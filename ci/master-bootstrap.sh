@@ -1014,5 +1014,16 @@ genrule(
     cmd = "uname -sr > $@",
 )
 SMOKE
-"$SRC/output/bazel" build //:hi
+# JVM は名前解決で AAAA を引き、経路が無くても先に試す。curl が 200 を
+# 返す箱で bazel だけが
+#
+#	Error accessing registry https://bcr.bazel.build/:
+#	  Failed to fetch registry file ...: No route to host
+#
+# と言う。IPv6 の経路が無い箱では v4 を先に使わせる。
+IPV4=
+netstat -rn -f inet6 2>/dev/null | grep -q "^default" || \
+	IPV4=--host_jvm_args=-Djava.net.preferIPv4Stack=true
+[ -n "$IPV4" ] && echo "  IPv6 の既定経路が無いので v4 を優先させる"
+"$SRC/output/bazel" $IPV4 build //:hi
 cat bazel-bin/hi.txt
