@@ -308,17 +308,35 @@ git log --oneline -1
 OV=""
 [ -n "${PATCH859:-}" ] && OV="$OV rules_cc=$PATCH859"
 [ -n "${PATCH_RULES_PYTHON:-}" ] && OV="$OV rules_python=$PATCH_RULES_PYTHON"
+# platforms と rules_java の当て物は、fork に置いてある固定の diff では版が
+# 上がった途端に当たらなくなる。実際 rules_java 9.7.2 に対して
+#
+#   Error applying patch .../rules_java_dragonfly.patch:
+#     in patch applied to /tmp/...
+#
+# で module の取得ごと落ちた。BCR から書庫を落として、その場で diff を
+# 起こす。版に追従するので、次に上がっても同じ所で転ばない。
+GEN=$SRC/gen_patch
+mkdir -p "$GEN"
+gen() {	# gen <module> <os> <OV へ足す名前>
+	python3 "$BZ/ci/make_module_patch.py" . "$1" "$GEN/$3.patch" "$2"
+	rc=$?
+	[ $rc -eq 2 ] && return 0	# 既に入っている
+	[ $rc -ne 0 ] && { echo "$1 の当て物が起こせない"; exit 1; }
+	OV="$OV $1=$GEN/$3.patch"
+}
+
 case "$(uname -s)" in
 NetBSD)
-	OV="$OV platforms=$BZ/toolchain_local/platforms_netbsd.patch"
-	OV="$OV rules_java=$BZ/toolchain_local/rules_java_netbsd.patch"
+	gen platforms netbsd platforms_netbsd
+	gen rules_java netbsd rules_java_netbsd
 	OV="$OV rules_go=$BZ/toolchain_local/rules_go_netbsd.patch"
 	OV="$OV zstd-jni=$BZ/toolchain_local/zstd_jni_netbsd.patch"
 	;;
 DragonFly)
 	OV="$OV rules_go=$BZ/ci/rules_go_dragonfly_goos.patch"
-	OV="$OV platforms=$BZ/toolchain_local/platforms_dragonfly.patch"
-	OV="$OV rules_java=$BZ/toolchain_local/rules_java_dragonfly.patch"
+	gen platforms dragonfly platforms_dragonfly
+	gen rules_java dragonfly rules_java_dragonfly
 	OV="$OV zstd-jni=$BZ/toolchain_local/zstd_jni_dragonfly.patch"
 	OV="$OV c-ares=$BZ/toolchain_local/c_ares_dragonfly.patch"
 	OV="$OV grpc=$BZ/toolchain_local/grpc_dragonfly.patch"
