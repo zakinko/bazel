@@ -245,7 +245,18 @@ def main():
             return 1
         lines[0] = "--- a/" + rel
         lines[1] = "+++ b/" + rel
-        chunks.append("\n".join(lines))
+        # 一つの当て物に二つ以上の file を入れるときは、file の頭に
+        #
+        #   diff -u -r a/<path> b/<path>
+        #
+        # が要る。これが無いと bazel の patch は二つ目の file を新しい
+        # file の始まりと見なさず、一つ目の hunk の行番号を持ち越して
+        #
+        #   could not apply patch due to CONTENT_DOES_NOT_MATCH_TARGET,
+        #   error applying change near line 22
+        #
+        # で落ちる (22 は一つ目の file の hunk の位置だった)。
+        chunks.append("diff -u -r a/%s b/%s\n" % (rel, rel) + "\n".join(lines))
 
     if not chunks:
         print("  当てるものが無い (既に入っている)")
