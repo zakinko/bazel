@@ -434,6 +434,19 @@ A="$A --host_linkopt=-lm --linkopt=-lm"
 # よる。BSD への移植とは関わりが無い。踏み台を建てる間は落とす。
 # exec 構成でも建てるので --host_javacopt の方も要る。
 A="$A --javacopt=-Xep:NullArgumentForNonNullParameter:OFF"
+
+# DragonFly の clang は module map を持っているので cc_configure が
+# layering_check を立てる。grpc がその検査に通らない。
+#
+#	wait_for_single_owner.h:20:10: error: module
+#	  grpc+//src/core:wait_for_single_owner does not depend on a module
+#	  exporting 'absl/functional/any_invocable.h'
+#
+# grpc の dep の書き漏らしで、BSD とは関わりが無い。FreeBSD の base clang
+# では検査自体が立たないので出ない。踏み台を建てる間は切る。
+case "$(uname -s)" in
+DragonFly)	A="$A --features=-layering_check" ;;
+esac
 A="$A --host_javacopt=-Xep:NullArgumentForNonNullParameter:OFF"
 
 # rules_java が配る java_tools には singlejar の C++ が入っている。出来合いの
