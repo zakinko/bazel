@@ -292,84 +292,39 @@ git clone -q --depth 1 https://github.com/bazelbuild/bazel.git "$SRC"
 cd "$SRC"
 git log --oneline -1
 
-# rules_cc の BSD toolchain は -lm を繋がない。libc++ の __hash_table が
-# ceilf を呼ぶので BSD ではリンクが通らない。#859。
-if [ -n "${PATCH859:-}" ]; then
-	mkdir -p toolchain_local
-	cp "$PATCH859" toolchain_local/rules_cc_859.patch
-	: > toolchain_local/BUILD
-	cat >> MODULE.bazel <<'M'
-
-single_version_override(
-    module_name = "rules_cc",
-    patch_strip = 1,
-    patches = ["//toolchain_local:rules_cc_859.patch"],
-)
-M
-fi
-
-# rules_python の runtime_env の launcher は sh -c の中の $@ を引用符で
-# 括っていないので、空白を含む引数が割れる。bazel 自身の proguard_jar が
+# module 側の当て物。同じ module へ二枚当てることも、upstream が既に持って
+# いる override へ差し込むこともあるので、add_overrides.py にまとめて渡す。
 #
-#	args.add("--timestamp", "1980-01-01 00:00:00")
-#
-# を渡すので、wrapper.py が
-#
-#	wrapper.py: error: unrecognized arguments: 00:00:00
-#
-# で落ちる。出来合いの CPython が在る platform では runtime_env の launcher を
-# 通らないので、BSD でだけ出る。
-if [ -n "${PATCH_RULES_PYTHON:-}" ]; then
-	cp "$PATCH_RULES_PYTHON" toolchain_local/rules_python_quote_args.patch
-	cat >> MODULE.bazel <<'M'
-
-single_version_override(
-    module_name = "rules_python",
-    patch_strip = 1,
-    patches = ["//toolchain_local:rules_python_quote_args.patch"],
-)
-M
-fi
-
-# rules_go の detect_host_platform は ctx.os.name をそのまま GOOS にする。
-# DragonFly では "dragonflybsd" になり、//go/toolchain:dragonflybsd という
-# 在りもしない target を指す。go は //src:bazel_nojdk の中身には要らないが、
-# 登録された toolchain は解決の時に必ず読まれるので、ここで解析が止まる。
-if [ -f "$BZ/ci/rules_go_dragonfly_goos.patch" ]; then
-	mkdir -p toolchain_local
-	: > toolchain_local/BUILD
-	cp "$BZ/ci/rules_go_dragonfly_goos.patch" \
-		toolchain_local/rules_go_dragonfly_goos.patch
-	cat >> MODULE.bazel <<'M'
-
-single_version_override(
-    module_name = "rules_go",
-    patch_strip = 1,
-    patches = ["//toolchain_local:rules_go_dragonfly_goos.patch"],
-)
-M
-fi
-
-# MODULE.bazel の pip.parse は requirements.txt を hub へ展開するのに、評価の
-# 時点で 3.11 の interpreter を要る。rules_python が配る CPython に BSD 向けが
-# 無いので、
-#
-#	Error: Unable to find interpreter for pip hub 'bazel_pip_dev_deps'
-#	  for python_version=3.11
-#
-# で module extension ごと落ちる。alias や requirement() の中身を使うのは
-# scripts/docs, src/test/py/bazel, src/test/tools/test_repos, tools/ctexplain
-# だけで、どれも //src:bazel_nojdk の graph の外に在る。ただし
-# third_party/py/ の下の BUILD は頭で requirement() を load していて、その
-# package は third_party/BUILD の srcs から引かれるので graph に入る (今は
-# frozendict と abseil の二つ)。
-# load は package を読む段階で走るので、誰も使わない repo の解決に build
-# 全体が引きずられる。踏み台を建てる間は要らないので、両方とも落とす。
-python3 "$BZ/ci/drop_pip_dev_deps.py" .
-if grep -rq bazel_pip_dev_deps MODULE.bazel third_party/py; then
-	echo "pip の塊が残っている"
-	exit 1
-fi
+#   rules_cc    BSD の toolchain が -lm を繋がない (#859)
+#   rules_python runtime_env の launcher が sh -c の中の "$@" を括らない
+#   rules_go    DragonFly では ctx.os.name が GOOS と綴りが違う
+#               NetBSD には Go SDK が配られていないので手元のものを使う
+#   platforms   host の os を返さないので //src/conditions:* が全部外れる
+#   rules_java  その OS の jni_md_header が無く select が linux へ落ちる
+#   zstd-jni    jni_md.h の select が linux へ落ちる
+#   c-ares      ares_config.h の select に DragonFly の腕が無く、linux の
+#               ものを取って HAVE_MALLOC_H が立ち、無い header を読む
+#   grpc        platform 判定の #elif に DragonFly が無い
+OV=""
+[ -n "${PATCH859:-}" ] && OV="$OV rules_cc=$PATCH859"
+[ -n "${PATCH_RULES_PYTHON:-}" ] && OV="$OV rules_python=$PATCH_RULES_PYTHON"
+case "$(uname -s)" in
+NetBSD)
+	OV="$OV platforms=$BZ/toolchain_local/platforms_netbsd.patch"
+	OV="$OV rules_java=$BZ/toolchain_local/rules_java_netbsd.patch"
+	OV="$OV rules_go=$BZ/toolchain_local/rules_go_netbsd.patch"
+	OV="$OV zstd-jni=$BZ/toolchain_local/zstd_jni_netbsd.patch"
+	;;
+DragonFly)
+	OV="$OV rules_go=$BZ/ci/rules_go_dragonfly_goos.patch"
+	OV="$OV platforms=$BZ/toolchain_local/platforms_dragonfly.patch"
+	OV="$OV rules_java=$BZ/toolchain_local/rules_java_dragonfly.patch"
+	OV="$OV zstd-jni=$BZ/toolchain_local/zstd_jni_dragonfly.patch"
+	OV="$OV c-ares=$BZ/toolchain_local/c_ares_dragonfly.patch"
+	OV="$OV grpc=$BZ/toolchain_local/grpc_dragonfly.patch"
+	;;
+esac
+python3 "$BZ/ci/add_overrides.py" . $OV
 
 # BUILD:345 が java_runtime に remotejdk_25 を名指ししている。remotejdk は
 # BSD 向けが配られていないので、ここで toolchain の解決が失敗する。
