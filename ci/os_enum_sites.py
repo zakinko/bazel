@@ -85,6 +85,33 @@ SITES = [
         '              Label.parseCanonicalUnchecked("@platforms//os:dragonfly")),\n'
         "          OS.DRAGONFLY,\n",
     ),
+    (
+        "src/conditions/BUILD.tools",
+        'config_setting(\n    name = "openbsd",\n'
+        '    constraint_values = ["@platforms//os:openbsd"],\n',
+        'config_setting(\n    name = "netbsd",\n'
+        '    constraint_values = ["@platforms//os:netbsd"],\n'
+        '    visibility = ["//visibility:public"],\n)\n\n'
+        'config_setting(\n    name = "dragonfly",\n'
+        '    constraint_values = ["@platforms//os:dragonfly"],\n'
+        '    visibility = ["//visibility:public"],\n)\n\n'
+        'config_setting(\n    name = "openbsd",\n'
+        '    constraint_values = ["@platforms//os:openbsd"],\n',
+    ),
+    (
+        "tools/jdk/BUILD.tools",
+        '    "jni_md_header-openbsd",\n',
+        '    "jni_md_header-netbsd",\n'
+        '    "jni_md_header-dragonfly",\n'
+        '    "jni_md_header-openbsd",\n',
+    ),
+    (
+        "third_party/BUILD",
+        '    "//src/conditions:openbsd": "*.so *.jnilib *.dll *.pyd",\n',
+        '    "//src/conditions:netbsd": "*.so *.jnilib *.dll *.pyd",\n'
+        '    "//src/conditions:dragonfly": "*.so *.jnilib *.dll *.pyd",\n'
+        '    "//src/conditions:openbsd": "*.so *.jnilib *.dll *.pyd",\n',
+    ),
 ]
 
 

@@ -24,10 +24,12 @@ import re
 import subprocess
 import sys
 import tarfile
+import zipfile
 import tempfile
 import urllib.request
 
 BCR = "https://bcr.bazel.build/modules/%s/%s/source.json"
+BCR_PATCH = "https://bcr.bazel.build/modules/%s/%s/patches/%s"
 
 
 def version_of(root, module):
@@ -47,11 +49,37 @@ def fetch(module, version, dest):
         src = json.load(f)
     with urllib.request.urlopen(src["url"], timeout=300) as f:
         blob = f.read()
-    tf = os.path.join(dest, "m.tar.gz")
+    tf = os.path.join(dest, "m.bin")
     io.open(tf, "wb").write(blob)
-    with tarfile.open(tf) as t:
-        t.extractall(os.path.join(dest, "a"))
-    return src.get("strip_prefix", "")
+    out = os.path.join(dest, "a")
+    # BCR の書庫は tar.gz のことも zip のこともある。中身で見分ける。
+    if blob[:2] == b"PK":
+        with zipfile.ZipFile(tf) as z:
+            z.extractall(out)
+    else:
+        with tarfile.open(tf) as t:
+            t.extractall(out)
+
+    strip = src.get("strip_prefix", "")
+    base = os.path.join(out, strip) if strip else out
+
+    # BCR 自身が当てている当て物を先に当てる。zstd-jni の BUILD.bazel は
+    # 上流の書庫には無く、add_build_file.patch が作っている。素の書庫を
+    # 見ているだけでは「BUILD.bazel が書庫に無い」で終わる。
+    for name, _ in sorted(src.get("patches", {}).items()):
+        url = BCR_PATCH % (module, version, name)
+        with urllib.request.urlopen(url, timeout=60) as f:
+            body = f.read()
+        pf = os.path.join(dest, name)
+        io.open(pf, "wb").write(body)
+        r = subprocess.run(["patch", "-p%d" % src.get("patch_strip", 0),
+                            "-s", "-i", pf], cwd=base,
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            raise SystemExit("  BCR の %s が当たらない: %s"
+                             % (name, (r.stdout + r.stderr)[:200]))
+        print("    BCR の当て物: %s" % name)
+    return strip
 
 
 # module ごとの書き換え。値は (repo 内の path, 書き換え関数) の並び。
@@ -105,10 +133,64 @@ def _platforms_constraint(osname):
     return f
 
 
+def _rules_go_goos():
+    """ctx.os.name をそのまま GOOS に使う所に DragonFly を足す。"""
+    def f(s):
+        if 'goos = "dragonfly"' in s:
+            return None
+        o = '    if goos == "mac os x":\n        goos = "darwin"\n'
+        if o not in s:
+            raise SystemExit("  detect_host_platform の darwin が見つからない")
+        return s.replace(o, o + '    elif goos == "dragonflybsd":\n'
+                         '        goos = "dragonfly"\n', 1)
+    return f
+
+
+def _rules_go_no_sdk():
+    """配られていない Go SDK を落としに行くのをやめ、手元のものを使う。"""
+    def f(s):
+        o = ('go_sdk.from_file(\n    name = "go_default_sdk",\n'
+             '    go_mod = "//:go.mod",\n)\n')
+        if o not in s:
+            return None
+        return s.replace(o, "", 1)
+    return f
+
+
+def _zstd_jni(osname):
+    def f(s):
+        if "src/conditions:%s" % osname in s:
+            return None
+        # copy_file の src は文字列。古い版は list だったので両方見る。
+        for q, r in (
+            ('        "@bazel_tools//src/conditions:openbsd": '
+             '"@bazel_tools//tools/jdk:jni_md_header-openbsd",\n',
+             '        "@bazel_tools//src/conditions:%s": '
+             '"@bazel_tools//tools/jdk:jni_md_header-%s",\n'),
+            ('        "@bazel_tools//src/conditions:openbsd": '
+             '["@bazel_tools//tools/jdk:jni_md_header-openbsd"],\n',
+             '        "@bazel_tools//src/conditions:%s": '
+             '["@bazel_tools//tools/jdk:jni_md_header-%s"],\n'),
+        ):
+            if q in s:
+                return s.replace(q, (r % (osname, osname)) + q, 1)
+        raise SystemExit("  zstd-jni の openbsd の行が見つからない")
+    return f
+
+
 EDITS = {
     "rules_java": {
         "netbsd": [("toolchains/BUILD", _rules_java("netbsd"))],
         "dragonfly": [("toolchains/BUILD", _rules_java("dragonfly"))],
+    },
+    "rules_go": {
+        "netbsd": [("MODULE.bazel", _rules_go_no_sdk()),
+                   ("go/private/sdk.bzl", _rules_go_goos())],
+        "dragonfly": [("go/private/sdk.bzl", _rules_go_goos())],
+    },
+    "zstd-jni": {
+        "netbsd": [("BUILD.bazel", _zstd_jni("netbsd"))],
+        "dragonfly": [("BUILD.bazel", _zstd_jni("dragonfly"))],
     },
     "platforms": {
         "netbsd": [("host/extension.bzl", _platforms_translate("netbsd"))],

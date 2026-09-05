@@ -330,14 +330,14 @@ case "$(uname -s)" in
 NetBSD)
 	gen platforms netbsd platforms_netbsd
 	gen rules_java netbsd rules_java_netbsd
-	OV="$OV rules_go=$BZ/toolchain_local/rules_go_netbsd.patch"
-	OV="$OV zstd-jni=$BZ/toolchain_local/zstd_jni_netbsd.patch"
+	gen rules_go netbsd rules_go_netbsd
+	gen zstd-jni netbsd zstd_jni_netbsd
 	;;
 DragonFly)
-	OV="$OV rules_go=$BZ/ci/rules_go_dragonfly_goos.patch"
 	gen platforms dragonfly platforms_dragonfly
 	gen rules_java dragonfly rules_java_dragonfly
-	OV="$OV zstd-jni=$BZ/toolchain_local/zstd_jni_dragonfly.patch"
+	gen rules_go dragonfly rules_go_dragonfly
+	gen zstd-jni dragonfly zstd_jni_dragonfly
 	OV="$OV c-ares=$BZ/toolchain_local/c_ares_dragonfly.patch"
 	OV="$OV grpc=$BZ/toolchain_local/grpc_dragonfly.patch"
 	;;
