@@ -102,6 +102,26 @@ SITES = [
         '    visibility = ["//visibility:public"],\n)\n',
     ),
     (
+        "src/main/cpp/BUILD",
+        '        "//src/conditions:openbsd": [\n        ],\n'
+        '        "//src/conditions:windows": WIN_LINK_OPTS,\n',
+        '        "//src/conditions:openbsd": [\n        ],\n'
+        '        "//src/conditions:netbsd": [\n        ],\n'
+        '        "//src/conditions:dragonfly": [\n        ],\n'
+        '        "//src/conditions:windows": WIN_LINK_OPTS,\n',
+    ),
+    (
+        "src/main/cpp/BUILD",
+        '        "//src/conditions:openbsd": [\n        ],\n'
+        '        "//src/conditions:windows": [\n        ],\n',
+        '        "//src/conditions:openbsd": [\n        ],\n'
+        '        "//src/conditions:netbsd": [\n        ],\n'
+        '        "//src/conditions:dragonfly": [\n'
+        '            "-lm",\n'
+        '        ],\n'
+        '        "//src/conditions:windows": [\n        ],\n',
+    ),
+    (
         "src/main/tools/BUILD",
         '        "//src/conditions:openbsd": ["dummy-sandbox.c"],\n',
         '        "//src/conditions:openbsd": ["dummy-sandbox.c"],\n'
