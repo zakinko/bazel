@@ -432,8 +432,19 @@ DragonFly)
 	;;
 esac
 
-if command -v go >/dev/null 2>&1; then
-	A="$A --repo_env=GOROOT=$(go env GOROOT)"
+# pkgsrc の go は go126 のように版を名前に持ち、素の "go" は PATH に
+# 現れない。command -v go だけ見て「無い」と判じると GOROOT を渡し損ね、
+# rules_go が配られていない SDK を落としに行って落ちる。
+GO=$(command -v go 2>/dev/null || true)
+if [ -z "$GO" ]; then
+	for g in $(ls /usr/pkg/bin/go1* /usr/local/bin/go1* 2>/dev/null | sort -r); do
+		case $g in *gofmt*) continue ;; esac
+		[ -x "$g" ] && { GO=$g; break; }
+	done
+fi
+if [ -n "$GO" ]; then
+	echo "  go: $GO ($($GO env GOROOT))"
+	A="$A --repo_env=GOROOT=$($GO env GOROOT)"
 fi
 A="$A --action_env=PATH=$PATH --host_action_env=PATH=$PATH --jobs=${JOBS:-2}"
 
