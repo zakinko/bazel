@@ -239,7 +239,19 @@ EDITS = {
 
 
 def main():
-    root, module, out, osname = sys.argv[1:5]
+    # <木の根> <module> <出す当て物> <os>...
+    #
+    # 一つの module に二つの OS 分を当てたいとき、別々の当て物を二枚渡す
+    # のは誤りである。どちらも素の file を基準に起こしているので、一枚目を
+    # 当てた後は二枚目の行番号がずれ、
+    #
+    #   Error applying patch .../rules_java_netbsd.patch
+    #
+    # で module の取得ごと落ちる。両方の書き換えを済ませてから一度だけ
+    # diff を取る。
+    root, module, out = sys.argv[1:4]
+    osnames = sys.argv[4:]
+    osname = osnames[0]
     version = version_of(root, module)
     if version is None:
         print("  %s の版が読めない" % module)
@@ -260,16 +272,33 @@ def main():
                 return q
         return None
 
+    # 同じ file を二つの OS が触ることがあるので、file ごとにまとめる
+    order = []
+    per_file = {}
+    for o in osnames:
+        for rel, fn in EDITS[module][o]:
+            if rel not in per_file:
+                per_file[rel] = []
+                order.append(rel)
+            per_file[rel].append((o, fn))
+
     chunks = []
-    for rel, fn in EDITS[module][osname]:
+    for rel in order:
         src = locate(rel)
         if src is None:
             print("  %s が書庫に無い" % rel)
             return 1
         cur = io.open(src, encoding="utf-8").read()
-        new = fn(cur)
-        if new is None:
-            print("  %s は既に %s を知っている" % (rel, osname))
+        new = cur
+        touched = False
+        for o, fn in per_file[rel]:
+            r = fn(new)
+            if r is None:
+                print("  %s は既に %s を知っている" % (rel, o))
+                continue
+            new = r
+            touched = True
+        if not touched:
             continue
         for side, text in (("old", cur), ("new", new)):
             q = os.path.join(d, side, rel)

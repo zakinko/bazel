@@ -318,12 +318,14 @@ OV=""
 # 起こす。版に追従するので、次に上がっても同じ所で転ばない。
 GEN=$SRC/gen_patch
 mkdir -p "$GEN"
-gen() {	# gen <module> <os> <OV へ足す名前>
-	python3 "$BZ/ci/make_module_patch.py" . "$1" "$GEN/$3.patch" "$2"
+gen() {	# gen <module> <出す名前> <os>...
+	m=$1; out=$2
+	shift 2
+	python3 "$BZ/ci/make_module_patch.py" . "$m" "$GEN/$out.patch" "$@"
 	rc=$?
 	[ $rc -eq 2 ] && return 0	# 既に入っている
-	[ $rc -ne 0 ] && { echo "$1 の当て物が起こせない"; exit 1; }
-	OV="$OV $1=$GEN/$3.patch"
+	[ $rc -ne 0 ] && { echo "$m の当て物が起こせない"; exit 1; }
+	OV="$OV $m=$GEN/$out.patch"
 }
 
 case "$(uname -s)" in
@@ -335,11 +337,9 @@ NetBSD)
 	#	  target 'dragonfly' not declared in package 'os'
 	#
 	# で select の解決が落ちる。宣言だけ在って誰も選ばない、が正しい形。
-	gen platforms netbsd platforms_netbsd
-	gen platforms dragonfly platforms_dragonfly
-	gen rules_java netbsd rules_java_netbsd
-	gen rules_java dragonfly rules_java_dragonfly
-	gen zstd-jni dragonfly zstd_jni_dragonfly
+	gen platforms platforms_bsd netbsd dragonfly
+	gen rules_java rules_java_bsd netbsd dragonfly
+	gen zstd-jni zstd_jni_bsd netbsd dragonfly
 	# rules_go の当て物は入れない。NetBSD では ctx.os.name も GOOS も
 	# "netbsd" で綴りが同じなので goos の直しは要らず、Go SDK の方は
 	# 下の --repo_env=GOROOT で手元のものを使わせている。
@@ -350,17 +350,13 @@ NetBSD)
 	#	  -> rules_go@0.46.0: error applying single_version_override
 	#
 	# と、こちらが見ている 0.59.0 とは違う版に当てられて落ちる。
-	gen zstd-jni netbsd zstd_jni_netbsd
 	;;
 DragonFly)
-	gen platforms netbsd platforms_netbsd
-	gen platforms dragonfly platforms_dragonfly
-	gen rules_java netbsd rules_java_netbsd
-	gen rules_java dragonfly rules_java_dragonfly
-	gen rules_go dragonfly rules_go_dragonfly
-	gen zstd-jni netbsd zstd_jni_netbsd
-	gen zstd-jni dragonfly zstd_jni_dragonfly
-	gen c-ares dragonfly c_ares_dragonfly
+	gen platforms platforms_bsd netbsd dragonfly
+	gen rules_java rules_java_bsd netbsd dragonfly
+	gen rules_go rules_go_dragonfly dragonfly
+	gen zstd-jni zstd_jni_bsd netbsd dragonfly
+	gen c-ares c_ares_dragonfly dragonfly
 	# abseil の当て物は 20250814.1 に patch -p1 --dry-run で通ることを
 	# 確かめてある (config.h / sysinfo.cc / vdso_support.cc / cctz)。
 	# 版が上がって当たらなくなったら生成に回す。
