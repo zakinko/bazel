@@ -347,7 +347,7 @@ DragonFly)
 	gen rules_java dragonfly rules_java_dragonfly
 	gen rules_go dragonfly rules_go_dragonfly
 	gen zstd-jni dragonfly zstd_jni_dragonfly
-	OV="$OV c-ares=$BZ/toolchain_local/c_ares_dragonfly.patch"
+	gen c-ares dragonfly c_ares_dragonfly
 	OV="$OV grpc=$BZ/toolchain_local/grpc_dragonfly.patch"
 	;;
 esac

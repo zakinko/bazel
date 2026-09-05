@@ -30,6 +30,7 @@ import urllib.request
 
 BCR = "https://bcr.bazel.build/modules/%s/%s/source.json"
 BCR_PATCH = "https://bcr.bazel.build/modules/%s/%s/patches/%s"
+BCR_OVERLAY = "https://bcr.bazel.build/modules/%s/%s/overlay/%s"
 
 
 def version_of(root, module):
@@ -62,6 +63,18 @@ def fetch(module, version, dest):
 
     strip = src.get("strip_prefix", "")
     base = os.path.join(out, strip) if strip else out
+
+    # 新しい BCR は patches ではなく overlay で file を被せることがある。
+    # c-ares の BUILD.bazel は上流の書庫に無く、overlay の側に在る。
+    for rel in sorted(src.get("overlay", {})):
+        url = BCR_OVERLAY % (module, version, rel)
+        with urllib.request.urlopen(url, timeout=120) as f:
+            body = f.read()
+        q = os.path.join(base, rel)
+        os.makedirs(os.path.dirname(q), exist_ok=True)
+        io.open(q, "wb").write(body)
+    if src.get("overlay"):
+        print("    overlay: %d file" % len(src["overlay"]))
 
     # BCR 自身が当てている当て物を先に当てる。zstd-jni の BUILD.bazel は
     # 上流の書庫には無く、add_build_file.patch が作っている。素の書庫を
@@ -178,6 +191,28 @@ def _zstd_jni(osname):
     return f
 
 
+def _c_ares(osname, like):
+    """ares_config.h を OS で選ぶ select に腕を足す。DragonFly は FreeBSD の
+    設定でよい。腕が無いと linux のものを取り、HAVE_MALLOC_H が立って
+    無い header (malloc.h) を読みに行く。"""
+    def f(s):
+        if '":%s"' % osname in s:
+            return None
+        o = ('config_setting(\n    name = "freebsd",\n'
+             '    constraint_values = ["@platforms//os:freebsd"],\n)\n')
+        if o not in s:
+            raise SystemExit("  c-ares の freebsd の config_setting が無い")
+        s = s.replace(o, 'config_setting(\n    name = "%s",\n'
+                      '    constraint_values = ["@platforms//os:%s"],\n)\n\n'
+                      % (osname, osname) + o, 1)
+        a = '        ":freebsd": "include/config_freebsd/ares_config.h",\n'
+        if a not in s:
+            raise SystemExit("  c-ares の select の freebsd の腕が無い")
+        return s.replace(a, '        ":%s": "include/config_%s/ares_config.h",\n'
+                         % (osname, like) + a, 1)
+    return f
+
+
 EDITS = {
     "rules_java": {
         "netbsd": [("toolchains/BUILD", _rules_java("netbsd"))],
@@ -191,6 +226,9 @@ EDITS = {
     "zstd-jni": {
         "netbsd": [("BUILD.bazel", _zstd_jni("netbsd"))],
         "dragonfly": [("BUILD.bazel", _zstd_jni("dragonfly"))],
+    },
+    "c-ares": {
+        "dragonfly": [("BUILD.bazel", _c_ares("dragonfly", "freebsd"))],
     },
     "platforms": {
         "netbsd": [("host/extension.bzl", _platforms_translate("netbsd"))],
