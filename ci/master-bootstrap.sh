@@ -330,7 +330,16 @@ case "$(uname -s)" in
 NetBSD)
 	gen platforms netbsd platforms_netbsd
 	gen rules_java netbsd rules_java_netbsd
-	gen rules_go netbsd rules_go_netbsd
+	# rules_go の当て物は入れない。NetBSD では ctx.os.name も GOOS も
+	# "netbsd" で綴りが同じなので goos の直しは要らず、Go SDK の方は
+	# 下の --repo_env=GOROOT で手元のものを使わせている。
+	#
+	# 入れると、rules_go 自身の MODULE.bazel を触る当て物になるため
+	#
+	#	in module dependency chain <root> -> grpc-java@1.71.0
+	#	  -> rules_go@0.46.0: error applying single_version_override
+	#
+	# と、こちらが見ている 0.59.0 とは違う版に当てられて落ちる。
 	gen zstd-jni netbsd zstd_jni_netbsd
 	;;
 DragonFly)
