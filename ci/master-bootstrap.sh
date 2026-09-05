@@ -348,6 +348,10 @@ DragonFly)
 	gen rules_go dragonfly rules_go_dragonfly
 	gen zstd-jni dragonfly zstd_jni_dragonfly
 	gen c-ares dragonfly c_ares_dragonfly
+	# abseil の当て物は 20250814.1 に patch -p1 --dry-run で通ることを
+	# 確かめてある (config.h / sysinfo.cc / vdso_support.cc / cctz)。
+	# 版が上がって当たらなくなったら生成に回す。
+	OV="$OV abseil-cpp=$BZ/toolchain_local/abseil_dragonfly.patch"
 	OV="$OV grpc=$BZ/toolchain_local/grpc_dragonfly.patch"
 	;;
 esac
