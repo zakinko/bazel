@@ -407,6 +407,17 @@ A="$A --java_language_version=$JAVA_VER --tool_java_language_version=$JAVA_VER"
 A="$A --extra_toolchains=@rules_python//python/runtime_env_toolchains:all"
 A="$A --host_linkopt=-lm --linkopt=-lm"
 
+# grpc-java を建てると ErrorProne の NullArgumentForNonNullParameter が
+# 立つ。
+#
+#	grpc-java+/api/src/main/java/io/grpc/CallOptions.java:532: error:
+#	  [NullArgumentForNonNullParameter] Null is not permitted for this
+#	  parameter.
+#
+# grpc-java 1.71.0 の側の問題で、こちらの移植とは関わりが無い。踏み台を
+# 建てる間は落とす。
+A="$A --javacopt=-Xep:NullArgumentForNonNullParameter:OFF"
+
 # rules_java が配る java_tools には singlejar の C++ が入っている。出来合いの
 # binary が在るのは linux/darwin/windows だけなので、BSD では source から
 # 建てることになり、そこの platform 判定で止まる。

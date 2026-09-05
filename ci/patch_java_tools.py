@@ -43,6 +43,10 @@ WIDEN = [
      "defined(__OpenBSD__)) &&",
      "defined(__OpenBSD__) || defined(__NetBSD__) || "
      "defined(__DragonFly__)) &&"),
+    ("cpp/util/md5.h",
+     "#elif defined(__FreeBSD__) || defined(__OpenBSD__)",
+     "#elif defined(__FreeBSD__) || defined(__OpenBSD__) || "
+     "defined(__NetBSD__) || \\\n    defined(__DragonFly__)"),
     ("singlejar/zip_headers.h",
      "#elif defined(__FreeBSD__) || defined(__OpenBSD__)",
      "#elif defined(__FreeBSD__) || defined(__OpenBSD__) || "
