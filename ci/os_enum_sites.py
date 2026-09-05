@@ -118,12 +118,6 @@ SITES = [
         "defined(__OpenBSD__) || defined(__NetBSD__) || defined(__DragonFly__)",
     ),
     (
-        "src/tools/singlejar/port.h",
-        "#elif defined(__OpenBSD__)",
-        "#elif defined(__OpenBSD__) || defined(__NetBSD__) || "
-        "defined(__DragonFly__)",
-    ),
-    (
         "src/tools/singlejar/mapped_file_posix.inc",
         "defined(__OpenBSD__)) &&",
         "defined(__OpenBSD__) || defined(__NetBSD__) || "
@@ -134,6 +128,60 @@ SITES = [
         "#elif defined(__FreeBSD__) || defined(__OpenBSD__)",
         "#elif defined(__FreeBSD__) || defined(__OpenBSD__) || "
         "defined(__NetBSD__) || defined(__DragonFly__)",
+    ),
+    (
+        "src/main/cpp/BUILD",
+        '        "//src/conditions:openbsd": [\n'
+        '            "blaze_util_bsd.cc",\n'
+        '            "blaze_util_posix.cc",\n'
+        '        ],\n',
+        '        "//src/conditions:openbsd": [\n'
+        '            "blaze_util_bsd.cc",\n'
+        '            "blaze_util_posix.cc",\n'
+        '        ],\n'
+        '        "//src/conditions:netbsd": [\n'
+        '            "blaze_util_bsd.cc",\n'
+        '            "blaze_util_posix.cc",\n'
+        '        ],\n'
+        '        "//src/conditions:dragonfly": [\n'
+        '            "blaze_util_bsd.cc",\n'
+        '            "blaze_util_posix.cc",\n'
+        '        ],\n',
+    ),
+    (
+        "src/main/cpp/blaze_util_bsd.cc",
+        '#elif defined(__OpenBSD__)\n'
+        '#define STANDARD_JAVABASE "/usr/local/jdk-21"\n',
+        '#elif defined(__OpenBSD__)\n'
+        '#define STANDARD_JAVABASE "/usr/local/jdk-21"\n'
+        '#elif defined(__NetBSD__)\n'
+        '# define STANDARD_JAVABASE "/usr/pkg/java/openjdk21"\n'
+        '#elif defined(__DragonFly__)\n'
+        '# define STANDARD_JAVABASE "/usr/local/openjdk21"\n',
+    ),
+    (
+        "src/main/cpp/blaze_util_bsd.cc",
+        "  struct statfs buf = {};\n"
+        "  if (statfs(output_base.AsNativePath().c_str(), &buf) < 0) {\n",
+        "#if defined(__NetBSD__)\n"
+        "  // NetBSD dropped statfs(2); statvfs(2) carries f_fstypename all\n"
+        "  // the same.\n"
+        "  struct statvfs buf = {};\n"
+        "  if (statvfs(output_base.AsNativePath().c_str(), &buf) < 0) {\n"
+        "#else\n"
+        "  struct statfs buf = {};\n"
+        "  if (statfs(output_base.AsNativePath().c_str(), &buf) < 0) {\n"
+        "#endif\n",
+    ),
+    (
+        "src/main/cpp/blaze_util_bsd.cc",
+        "#elif defined(__OpenBSD__)\n"
+        "  // OpenBSD does not provide a way for a running process to find a"
+        " path to its\n",
+        "#elif defined(__OpenBSD__) || defined(__NetBSD__) || "
+        "defined(__DragonFly__)\n"
+        "  // OpenBSD does not provide a way for a running process to find a"
+        " path to its\n",
     ),
 ]
 
