@@ -66,6 +66,15 @@ def main():
         with zipfile.ZipFile(z) as f:
             f.extractall(root)
 
+    # --override_repository が指す先は repo の根として読まれるので、目印が
+    # 要る。java_tools の zip は BUILD しか持っていない。
+    #
+    #   No MODULE.bazel, REPO.bazel, or WORKSPACE file found in ...
+    #
+    marker = os.path.join(root, "REPO.bazel")
+    if not os.path.exists(marker):
+        io.open(marker, "w").write("")
+
     hit = 0
     for dirpath, _, names in os.walk(root):
         for n in names:
