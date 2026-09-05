@@ -835,7 +835,17 @@ esac
 #	unix_jni_bsd.cc:21:3: error: #error This BSD is not supported
 #
 # で止まる。NetBSD には extattr も sysctlbyname も無いので OpenBSD と同じ
-# 扱いでよい。DragonFly は FreeBSD と同じで両方在る。
+# 扱いでよい。DragonFly は FreeBSD と同じだろうと決めつけて両方立てたが、
+# それは誤りだった。header は在るのに libc に実体が無く、compile は通って
+# server の起動時に落ちる。
+#
+#	JNI initialization failed: libunix_jni.so:
+#	  Undefined symbol "extattr_get_link"
+#
+# 実測 (DragonFly 6.4.2):
+#	/usr/include/sys/extattr.h        在り
+#	nm -D /lib/libc.so.8 | extattr_   0 件
+#	nm -D /lib/libc.so.8 | sysctlbyname  1 件
 case "$(uname -s)" in
 NetBSD|DragonFly)
 	python3 - src/main/native/unix_jni_bsd.cc <<'UJB'
@@ -849,8 +859,12 @@ old = ("#if defined(__FreeBSD__)\n"
        "# define HAVE_EXTATTR\n"
        "# define HAVE_SYSCTLBYNAME\n"
        "#elif defined(__OpenBSD__)\n")
-new = ("#if defined(__FreeBSD__) || defined(__DragonFly__)\n"
+new = ("#if defined(__FreeBSD__)\n"
        "# define HAVE_EXTATTR\n"
+       "# define HAVE_SYSCTLBYNAME\n"
+       "#elif defined(__DragonFly__)\n"
+       "// sys/extattr.h is here but libc does not implement it; measured on\n"
+       "// 6.4.2, nm -D /lib/libc.so.8 has sysctlbyname and no extattr_*.\n"
        "# define HAVE_SYSCTLBYNAME\n"
        "#elif defined(__OpenBSD__) || defined(__NetBSD__)\n")
 if old not in s:
