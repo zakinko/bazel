@@ -304,6 +304,22 @@ fi
 echo "=== master を取る"
 rm -rf "$SRC"
 git clone -q --depth 1 https://github.com/bazelbuild/bazel.git "$SRC"
+# BAZEL_REV を指すと、その commit に釘付けする。ci/collected の当て物は
+# 948b8c70 に対して起こしてあるので、統合 build はそこに合わせる。
+if [ -n "${BAZEL_REV:-}" ]; then
+	(cd "$SRC" && git fetch -q --depth 1 origin "$BAZEL_REV" &&
+		git checkout -q FETCH_HEAD) ||
+		{ echo "bazel の $BAZEL_REV が取れない"; exit 1; }
+fi
+# COLLECTED=1 は「script の直接編集の代わりに、固めた当て物を当てる」
+# mode。os_enum_sites.py や埋め込みの書き換えは「既に当たっていれば飛ばす」
+# 判定を持つので、ここで一度当てておけば後段は no-op になる。OS を問わず
+# 同じ patch を当てるのが眼目で、OS ごとに違う組で建てていた測定とは別物。
+if [ -n "${COLLECTED:-}" ]; then
+	(cd "$SRC" && patch -p1 -s < "$BZ/ci/collected/bazel_bsd.patch") ||
+		{ echo "ci/collected/bazel_bsd.patch が当たらない"; exit 1; }
+	echo "=== ci/collected/bazel_bsd.patch を当てた ($(cd "$SRC" && git rev-parse --short HEAD))"
+fi
 cd "$SRC"
 git log --oneline -1
 
@@ -353,6 +369,17 @@ gen() {	# gen <module> <出す名前> <os>...
 	OV="$OV $m=$GEN/$out.patch"
 }
 
+if [ -n "${COLLECTED:-}" ]; then
+	# 統合 build。OS で分けず、固めた当て物を全部同じ組で入れる。NetBSD で
+	# rules_go を入れると版ずれで落ちた記録が下に在るが、それも含めて
+	# 「一つの組が五つ全部で建つか」を測るのがこの mode の目的。
+	C=$BZ/ci/collected
+	for kv in platforms=platforms_bsd rules_java=rules_java_bsd \
+		  zstd-jni=zstd_jni_bsd rules_go=rules_go_dfly c-ares=c_ares_dfly \
+		  abseil-cpp=abseil_dragonfly grpc=grpc_dragonfly; do
+		OV="$OV ${kv%%=*}=$C/${kv##*=}.patch"
+	done
+else
 case "$(uname -s)" in
 NetBSD)
 	# 二つ分を入れる。木の側は netbsd と dragonfly の両方の条件を書くので、
@@ -389,6 +416,7 @@ DragonFly)
 	OV="$OV grpc=$BZ/toolchain_local/grpc_dragonfly.patch"
 	;;
 esac
+fi
 # STATIC_BSD=1 は測定用。rules_cc の静的 BSD toolchain 経路に netbsd と
 # dragonfly を乗せる当て物を足し、代わりに外から渡していた松葉杖
 # (-lm と gnu++17) を渡さない。toolchain が独り立ちできるかを測る。
