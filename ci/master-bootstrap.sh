@@ -901,8 +901,10 @@ new = ("#if defined(__FreeBSD__)\n"
        "# define HAVE_EXTATTR\n"
        "# define HAVE_SYSCTLBYNAME\n"
        "#elif defined(__DragonFly__)\n"
-       "// sys/extattr.h is here but libc does not implement it; measured on\n"
-       "// 6.4.2, nm -D /lib/libc.so.8 has sysctlbyname and no extattr_*.\n"
+       "// sys/extattr.h declares the whole extattr(2) family, but libc on 6.4\n"
+       "// defines only the _file variants; the _link ones called below are\n"
+       "// missing, so HAVE_EXTATTR would leave libunix_jni.so with an undefined\n"
+       "// symbol.  sysctlbyname(3) is present.\n"
        "# define HAVE_SYSCTLBYNAME\n"
        "#elif defined(__OpenBSD__) || defined(__NetBSD__)\n")
 if old not in s:
