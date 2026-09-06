@@ -1,0 +1,89 @@
+diff -u -r a/include/grpc/support/port_platform.h b/include/grpc/support/port_platform.h
+--- a/include/grpc/support/port_platform.h
++++ b/include/grpc/support/port_platform.h
+@@ -316,6 +316,30 @@
+ #define _BSD_SOURCE
+ #endif
+ #define GPR_FREEBSD 1
++#define GPR_CPU_POSIX 1
++#define GPR_GCC_ATOMIC 1
++#define GPR_POSIX_LOG 1
++#define GPR_POSIX_ENV 1
++#define GPR_POSIX_TMPFILE 1
++#define GPR_POSIX_STAT 1
++#define GPR_POSIX_STRING 1
++#define GPR_POSIX_SUBPROCESS 1
++#define GPR_POSIX_SYNC 1
++#define GPR_POSIX_TIME 1
++#define GPR_HAS_PTHREAD_H 1
++#define GPR_GETPID_IN_UNISTD_H 1
++#define GPR_SUPPORT_CHANNELS_FROM_FD 1
++#ifdef _LP64
++#define GPR_ARCH_64 1
++#else /* _LP64 */
++#define GPR_ARCH_32 1
++#endif /* _LP64 */
++#elif defined(__DragonFly__)
++#define GPR_PLATFORM_STRING "dragonfly"
++#ifndef _BSD_SOURCE
++#define _BSD_SOURCE
++#endif
++#define GPR_DRAGONFLY 1
+ #define GPR_CPU_POSIX 1
+ #define GPR_GCC_ATOMIC 1
+ #define GPR_POSIX_LOG 1
+diff -u -r a/include/grpc/event_engine/port.h b/include/grpc/event_engine/port.h
+--- a/include/grpc/event_engine/port.h
++++ b/include/grpc/event_engine/port.h
+@@ -20,7 +20,8 @@
+ #if defined(GPR_ANDROID) || defined(GPR_LINUX) || defined(GPR_APPLE) ||     \
+     defined(GPR_FREEBSD) || defined(GPR_OPENBSD) || defined(GPR_SOLARIS) || \
+     defined(GPR_AIX) || defined(GPR_NACL) || defined(GPR_FUCHSIA) ||        \
+-    defined(GRPC_POSIX_SOCKET) || defined(GPR_NETBSD)
++    defined(GRPC_POSIX_SOCKET) || defined(GPR_NETBSD) ||                   \
++    defined(GPR_DRAGONFLY)
+ #define GRPC_EVENT_ENGINE_POSIX
+ #include <arpa/inet.h>
+ #include <netdb.h>
+diff -u -r a/src/core/lib/iomgr/port.h b/src/core/lib/iomgr/port.h
+--- a/src/core/lib/iomgr/port.h
++++ b/src/core/lib/iomgr/port.h
+@@ -149,6 +149,17 @@
+ #define GRPC_POSIX_SOCKET 1
+ #define GRPC_POSIX_SOCKETUTILS 1
+ #define GRPC_POSIX_WAKEUP_FD 1
++#elif defined(GPR_DRAGONFLY)
++#define GRPC_HAVE_ARPA_NAMESER 1
++#define GRPC_HAVE_IFADDRS 1
++#define GRPC_HAVE_IPV6_RECVPKTINFO 1
++#define GRPC_HAVE_SO_NOSIGPIPE 1
++#define GRPC_HAVE_UNIX_SOCKET 1
++#define GRPC_POSIX_FORK 1
++#define GRPC_POSIX_NO_SPECIAL_WAKEUP_FD 1
++#define GRPC_POSIX_SOCKET 1
++#define GRPC_POSIX_SOCKETUTILS 1
++#define GRPC_POSIX_WAKEUP_FD 1
+ #elif defined(GPR_OPENBSD)
+ #define GRPC_HAVE_IFADDRS 1
+ #define GRPC_HAVE_IPV6_RECVPKTINFO 1
+diff -u -r a/src/core/lib/event_engine/posix_engine/set_socket_dualstack.cc b/src/core/lib/event_engine/posix_engine/set_socket_dualstack.cc
+--- a/src/core/lib/event_engine/posix_engine/set_socket_dualstack.cc
++++ b/src/core/lib/event_engine/posix_engine/set_socket_dualstack.cc
+@@ -54,8 +54,17 @@
+ #ifndef GRPC_SET_SOCKET_DUALSTACK_CUSTOM
+ 
+ bool SetSocketDualStack(int fd) {
++#ifdef GPR_DRAGONFLY
++  // DragonFly accepts IPV6_V6ONLY=0 but has no IPv4-mapped IPv6 addresses,
++  // so a socket set up this way still cannot reach ::ffff:127.0.0.1 and
++  // connect() fails with EADDRNOTAVAIL.  Reporting no dualstack support
++  // makes the caller fall back to AF_INET, which works.
++  (void)fd;
++  return false;
++#else
+   const int off = 0;
+   return 0 == setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &off, sizeof(off));
++#endif
+ }
+ 
+ #endif  // GRPC_SET_SOCKET_DUALSTACK_CUSTOM

@@ -1,0 +1,23 @@
+diff -u -r a/BUILD.bazel b/BUILD.bazel
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -46,6 +46,11 @@
+ )
+ 
+ config_setting(
++    name = "dragonfly",
++    constraint_values = ["@platforms//os:dragonfly"],
++)
++
++config_setting(
+     name = "freebsd",
+     constraint_values = ["@platforms//os:freebsd"],
+ )
+@@ -61,6 +66,7 @@
+         ":windows": "include/config_windows/ares_config.h",
+         ":android": "include/config_android/ares_config.h",
+         ":openbsd": "include/config_openbsd/ares_config.h",
++        ":dragonfly": "include/config_freebsd/ares_config.h",
+         ":freebsd": "include/config_freebsd/ares_config.h",
+         "//conditions:default": "include/config_linux/ares_config.h",
+     }),

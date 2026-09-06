@@ -1,0 +1,12 @@
+diff -u -r a/go/private/sdk.bzl b/go/private/sdk.bzl
+--- a/go/private/sdk.bzl
++++ b/go/private/sdk.bzl
+@@ -466,6 +466,8 @@
+     goos = ctx.os.name
+     if goos == "mac os x":
+         goos = "darwin"
++    elif goos == "dragonflybsd":
++        goos = "dragonfly"
+     elif goos.startswith("windows"):
+         goos = "windows"
+ 
