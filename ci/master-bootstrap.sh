@@ -321,7 +321,17 @@ git log --oneline -1
 #               ものを取って HAVE_MALLOC_H が立ち、無い header を読む
 #   grpc        platform 判定の #elif に DragonFly が無い
 OV=""
-[ -n "${PATCH859:-}" ] && OV="$OV rules_cc=$PATCH859"
+# STATIC_BSD のときは 859 と静的経路を一枚に合成したものだけを渡す。二枚に
+# 分けると add_overrides が新しい方を先頭に差すので、859 の後の文脈で作った
+# 当て物が 859 より先に当てられて外れる。
+#
+#	Error applying patch .../rules_cc_bsd_static.patch
+#
+if [ -n "${STATIC_BSD:-}" ]; then
+	OV="$OV rules_cc=$BZ/ci/rules_cc_859_bsd_static.patch"
+elif [ -n "${PATCH859:-}" ]; then
+	OV="$OV rules_cc=$PATCH859"
+fi
 [ -n "${PATCH_RULES_PYTHON:-}" ] && OV="$OV rules_python=$PATCH_RULES_PYTHON"
 # platforms と rules_java の当て物は、fork に置いてある固定の diff では版が
 # 上がった途端に当たらなくなる。実際 rules_java 9.7.2 に対して
@@ -382,9 +392,6 @@ esac
 # STATIC_BSD=1 は測定用。rules_cc の静的 BSD toolchain 経路に netbsd と
 # dragonfly を乗せる当て物を足し、代わりに外から渡していた松葉杖
 # (-lm と gnu++17) を渡さない。toolchain が独り立ちできるかを測る。
-if [ -n "${STATIC_BSD:-}" ]; then
-	OV="$OV rules_cc=$BZ/ci/rules_cc_bsd_static.patch"
-fi
 python3 "$BZ/ci/add_overrides.py" . $OV
 
 # MODULE.bazel の pip.parse は requirements.txt を hub へ展開するのに、評価の

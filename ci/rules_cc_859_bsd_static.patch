@@ -42,25 +42,33 @@ diff -u -r a/cc/private/toolchain/bsd_cc_toolchain_config.bzl b/cc/private/toolc
      compiler = "compiler"
      toolchain_identifier = "local_{}".format(cpu) if is_bsd else "stub_armeabi-v7a"
      host_system_name = "local" if is_bsd else "armeabi-v7a"
-@@ -76,6 +81,8 @@
-     extra_default_link_flags = []
-     if cpu == "openbsd":
-         extra_default_link_flags = ["-lc++abi", "-lpthread"]
+@@ -73,6 +78,11 @@
+     )
+ 
+     action_configs = [objcopy_embed_data_action] if is_bsd else []
++    extra_default_link_flags = []
++    if cpu == "openbsd":
++        extra_default_link_flags = ["-lc++abi", "-lpthread"]
 +    if is_gcc_bsd:
 +        extra_default_link_flags = ["-lpthread"]
  
      default_link_flags_feature = feature(
          name = "default_link_flags",
-@@ -86,7 +93,7 @@
+@@ -83,10 +93,11 @@
                  flag_groups = [
                      flag_group(
                          flags = [
 -                            "-lc++",
 +                            "-lstdc++" if is_gcc_bsd else "-lc++",
-                             "-lm",
++                            "-lm",
                              "-Wl,-z,relro,-z,now",
                              "-no-canonical-prefixes",
-@@ -246,7 +253,13 @@
+-                        ],
++                        ] + extra_default_link_flags,
+                     ),
+                 ],
+             ),
+@@ -242,7 +253,13 @@
      else:
          features = [supports_dynamic_linker_feature, supports_pic_feature]
  
@@ -75,7 +83,7 @@ diff -u -r a/cc/private/toolchain/bsd_cc_toolchain_config.bzl b/cc/private/toolc
          cxx_builtin_include_directories = ["/usr/lib/clang", "/usr/local/include", "/usr/include"]
      else:
          cxx_builtin_include_directories = []
-@@ -257,7 +270,10 @@
+@@ -253,7 +270,10 @@
              tool_path(name = "compat-ld", path = "/usr/bin/ld"),
              tool_path(name = "cpp", path = "/usr/bin/cpp"),
              tool_path(name = "dwp", path = "/usr/bin/dwp"),
