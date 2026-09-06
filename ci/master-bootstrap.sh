@@ -379,6 +379,12 @@ DragonFly)
 	OV="$OV grpc=$BZ/toolchain_local/grpc_dragonfly.patch"
 	;;
 esac
+# STATIC_BSD=1 は測定用。rules_cc の静的 BSD toolchain 経路に netbsd と
+# dragonfly を乗せる当て物を足し、代わりに外から渡していた松葉杖
+# (-lm と gnu++17) を渡さない。toolchain が独り立ちできるかを測る。
+if [ -n "${STATIC_BSD:-}" ]; then
+	OV="$OV rules_cc=$BZ/ci/rules_cc_bsd_static.patch"
+fi
 python3 "$BZ/ci/add_overrides.py" . $OV
 
 # MODULE.bazel の pip.parse は requirements.txt を hub へ展開するのに、評価の
@@ -412,15 +418,19 @@ grep -q "toolchains:current_java_runtime" BUILD || { echo "BUILD の書き換え
 # __STRICT_ANSI__ が立ち、BSD の header が C99 と POSIX の名前を隠す。
 # FreeBSD は libc++ の __locale が isascii で、DragonFly は libstdc++ の
 # cwchar が vfwscanf で落ちる。repository rule なので client の環境を見る。
-BAZEL_CXXOPTS=-std=gnu++17
-export BAZEL_CXXOPTS
+if [ -z "${STATIC_BSD:-}" ]; then
+	BAZEL_CXXOPTS=-std=gnu++17
+	export BAZEL_CXXOPTS
+fi
 
 A="--java_runtime_version=local_jdk --tool_java_runtime_version=local_jdk"
 A="$A --java_language_version=$JAVA_VER --tool_java_language_version=$JAVA_VER"
 # rules_python が落とす CPython にも BSD 向けが無い。system の python3 を
 # 使う toolchain を足す。
 A="$A --extra_toolchains=@rules_python//python/runtime_env_toolchains:all"
-A="$A --host_linkopt=-lm --linkopt=-lm"
+if [ -z "${STATIC_BSD:-}" ]; then
+	A="$A --host_linkopt=-lm --linkopt=-lm"
+fi
 
 # ErrorProne の NullArgumentForNonNullParameter が立つ。grpc-java でも
 # bazel 自身の net/starlark でも出る。
@@ -464,7 +474,9 @@ NetBSD|DragonFly)
 	A="$A --override_repository=rules_java++toolchains+remote_java_tools=$JT"
 	;;
 esac
-A="$A --cxxopt=-std=gnu++17 --host_cxxopt=-std=gnu++17"
+if [ -z "${STATIC_BSD:-}" ]; then
+	A="$A --cxxopt=-std=gnu++17 --host_cxxopt=-std=gnu++17"
+fi
 
 # isascii が見えなくなるのは protobuf 自身の仕業である。
 #
