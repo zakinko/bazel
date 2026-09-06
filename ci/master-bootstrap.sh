@@ -474,9 +474,24 @@ A="$A --host_javacopt=-Xep:NullArgumentForNonNullParameter:OFF"
 #
 # module ではないので single_version_override では当てられない。落として
 # 広げて差し替える。
+#
+# 版は決め打ちにしない。rules_java が上がって別の java_tools を要求すると、
+# 古いものを落として override するので、黙って版がずれる。木の MODULE.bazel
+# が指す rules_java の版から、その rules_java が要求する java_tools の版を
+# 引く: rules_java の java/repositories.bzl に java_v<N> と書いてある。
 case "$(uname -s)" in
 NetBSD|DragonFly)
-	JT=$(python3 "$BZ/ci/patch_java_tools.py" "$W")
+	RJV=$(sed -n 's/.*name = "rules_java", version = "\([^"]*\)".*/\1/p' \
+		MODULE.bazel | head -1)
+	JTV=$(curl -sfL \
+		"https://raw.githubusercontent.com/bazelbuild/rules_java/$RJV/java/repositories.bzl" \
+		2>/dev/null | grep -o "java_v[0-9][0-9.]*" | head -1 | sed 's/java_//')
+	if [ -z "$JTV" ]; then
+		echo "rules_java $RJV から java_tools の版を引けない"
+		exit 1
+	fi
+	echo "  rules_java $RJV -> java_tools $JTV"
+	JT=$(python3 "$BZ/ci/patch_java_tools.py" "$W" "$JTV")
 	[ -d "$JT" ] || { echo "java_tools を用意できない"; exit 1; }
 	A="$A --override_repository=rules_java++toolchains+remote_java_tools=$JT"
 	;;
