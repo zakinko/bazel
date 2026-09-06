@@ -1048,8 +1048,16 @@ NetBSD|DragonFly)
 	printf '/usr/bin/md5 "$@" | /usr/bin/md5 | head -c 32\n' \
 		> "$SRC/src/md5_netbsd.sh"
 	chmod 755 "$SRC/src/md5_netbsd.sh"
-	python3 "$BZ/ci/os_enum_sites.py" "$SRC" ||
-		{ echo "OS の列挙の書き換えが当たっていない"; exit 1; }
+	if [ -n "${COLLECTED:-}" ]; then
+		# 統合 build では bazel_bsd.patch が同じ site を既に触っている。
+		# os_enum_sites.py の「済み」判定はそれを見抜けず、NetBSD で OS.java の
+		# enum に NETBSD/DRAGONFLY を二重に足して javac が 187 個の error で
+		# 落ちた (variable NETBSD is already defined in enum OS)。飛ばす。
+		echo "  COLLECTED: os_enum_sites.py は飛ばす (bazel_bsd.patch 済)"
+	else
+		python3 "$BZ/ci/os_enum_sites.py" "$SRC" ||
+			{ echo "OS の列挙の書き換えが当たっていない"; exit 1; }
+	fi
 	;;
 esac
 
