@@ -855,16 +855,20 @@ esac
 #
 # で止まる。NetBSD には extattr も sysctlbyname も無いので OpenBSD と同じ
 # 扱いでよい。DragonFly は FreeBSD と同じだろうと決めつけて両方立てたが、
-# それは誤りだった。header は在るのに libc に実体が無く、compile は通って
-# server の起動時に落ちる。
+# それは誤りだった。compile は通って server の起動時に落ちる。
 #
 #	JNI initialization failed: libunix_jni.so:
 #	  Undefined symbol "extattr_get_link"
 #
-# 実測 (DragonFly 6.4.2):
-#	/usr/include/sys/extattr.h        在り
-#	nm -D /lib/libc.so.8 | extattr_   0 件
-#	nm -D /lib/libc.so.8 | sysctlbyname  1 件
+# 「libc に実体が無い」も言い過ぎで、正確には世代の違いである。実測
+# (DragonFly 6.4.2 の /lib/libc.so.8):
+#
+#	在る  extattr_get_file / set_file / delete_file / extattrctl
+#	無い  extattr_{get,set,delete}_link と extattr_list_* (0 件)
+#
+# unix_jni_bsd.cc は get_file と get_link の両方を呼ぶので、_link の無い
+# DragonFly では HAVE_EXTATTR を立てられない。なお在る方の四つも UFS では
+# EOPNOTSUPP を返す (netbsd-i386-29 の実測)。sysctlbyname は在る。
 case "$(uname -s)" in
 NetBSD|DragonFly)
 	python3 - src/main/native/unix_jni_bsd.cc <<'UJB'
