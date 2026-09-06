@@ -307,6 +307,11 @@ git clone -q --depth 1 https://github.com/bazelbuild/bazel.git "$SRC"
 # BAZEL_REV を指すと、その commit に釘付けする。ci/collected の当て物は
 # 948b8c70 に対して起こしてあるので、統合 build はそこに合わせる。
 if [ -n "${BAZEL_REV:-}" ]; then
+	# 短縮 SHA は ref として引けない (couldn't find remote ref)。40 桁を要る。
+	case "$BAZEL_REV" in
+	????????????????????????????????????????) ;;
+	*) echo "BAZEL_REV は 40 桁の SHA で指す: $BAZEL_REV"; exit 1 ;;
+	esac
 	(cd "$SRC" && git fetch -q --depth 1 origin "$BAZEL_REV" &&
 		git checkout -q FETCH_HEAD) ||
 		{ echo "bazel の $BAZEL_REV が取れない"; exit 1; }
