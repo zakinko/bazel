@@ -1,0 +1,63 @@
+# One-off check for the WriteFile /dev/null fix. Lives on this branch only;
+# the branch sent upstream carries the three-line change and nothing else.
+name: devnull
+on:
+  push:
+    branches: [devnull-unlink-ci]
+  workflow_dispatch:
+concurrency:
+  group: devnull-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  # Does the change build and does file_test pass, as an ordinary user.
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: bazelbuild/setup-bazelisk@v3
+      - shell: bash
+        run: |
+          bazel version
+          bazel test //src/test/cpp/util:file_test --test_output=errors
+
+  # With the change, running as root leaves /dev/null alone.
+  root-after:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: bazelbuild/setup-bazelisk@v3
+      - run: mount | grep ' /dev ' ; stat -c 'before  %F  %A  %t:%T' /dev/null
+      - run: sudo -E env "PATH=$PATH" bazel --output_user_root=/var/tmp/bzl test --spawn_strategy=local //src/test/cpp/util:file_test --test_filter=FilePosixTest.WriteFileLeavesDevNullAlone --test_output=errors
+      - run: stat -c 'after   %F  %A  %t:%T  size=%s' /dev/null
+      - run: test -c /dev/null
+
+  # Without the change (upstream base), the same run replaces /dev/null with
+  # a regular file. Green here means the bug reproduced.
+  root-before:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: bazelbuild/bazel
+          ref: 870abbbd4bfca78e15b6fd6cc3e0985dc9cb7243
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: bazelbuild/setup-bazelisk@v3
+      - run: mount | grep ' /dev ' ; stat -c 'before  %F  %A  %t:%T' /dev/null
+      - run: sudo -E env "PATH=$PATH" bazel --output_user_root=/var/tmp/bzl test --spawn_strategy=local //src/test/cpp/util:file_test --test_filter=FileTest.TestWriteFile --test_output=errors || true
+      - run: stat -c 'after   %F  %A  %t:%T  size=%s' /dev/null
+      - run: '! test -c /dev/null'
