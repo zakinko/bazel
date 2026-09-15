@@ -87,6 +87,7 @@ cc_binary(
     ],
     linkopts = select({
         "//src/conditions:freebsd": ["-lm"],
+        "//src/conditions:netbsd": ["-lm"],
         "//src/conditions:openbsd": ["-lm"],
         # MinGW requires -municode when using wmain.
         "//src/conditions:windows_gcc_like": ["-municode"],
@@ -110,6 +111,7 @@ cc_binary(
     ],
     linkopts = select({
         "//src/conditions:freebsd": ["-lm"],
+        "//src/conditions:netbsd": ["-lm"],
         "//src/conditions:openbsd": ["-lm"],
         # MinGW requires -municode when using wmain.
         "//src/conditions:windows_gcc_like": ["-municode"],

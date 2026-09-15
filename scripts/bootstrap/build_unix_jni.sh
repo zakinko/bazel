@@ -61,6 +61,10 @@ freebsd)
   SOURCES+=(src/main/native/unix_jni_bsd.cc)
   FLAGS+=("-I${JAVA_HOME}/include/freebsd")
   ;;
+netbsd)
+  SOURCES+=(src/main/native/unix_jni_bsd.cc)
+  FLAGS+=("-I${JAVA_HOME}/include/netbsd")
+  ;;
 esac
 
 if [[ -f "${RUST_LIB}" ]]; then
@@ -70,7 +74,7 @@ if [[ -f "${RUST_LIB}" ]]; then
   done < "${RUST_LINK_FLAGS}"
   case "$PLATFORM" in
     linux) LIBS+=("-ldl" "-lpthread") ;;
-    freebsd|openbsd) LIBS+=("-lpthread") ;;
+    freebsd|netbsd|openbsd) LIBS+=("-lpthread") ;;
   esac
 fi
 
