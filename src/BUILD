@@ -27,6 +27,7 @@ sh_binary(
         "//src/conditions:darwin": ["md5_darwin_freebsd.sh"],
         "//src/conditions:freebsd": ["md5_darwin_freebsd.sh"],
         "//src/conditions:openbsd": ["md5_openbsd.sh"],
+        "//src/conditions:netbsd": ["md5_netbsd.sh"],
         "//conditions:default": ["md5_default.sh"],
     }),
 )
