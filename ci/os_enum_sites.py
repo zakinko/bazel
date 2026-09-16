@@ -29,17 +29,24 @@ import sys
 # (相対 path, 元の文字列, 置き換え後) の並び。どれも「FreeBSD と OpenBSD は
 # 書かれているのに NetBSD と DragonFly が無い」という同じ形をしている。
 SITES = [
+    # OS.java は 61673d46da (Make `OS.isPosixCompatible` an instance method)
+    # で形が変わった。POSIX かどうかは
+    #
+    #	EnumSet.of(DARWIN, FREEBSD, OPENBSD, LINUX)
+    #
+    # という一覧ではなく、enum の第三引数が持つようになっている。二引数の
+    # 形を探していたのでどちらの site も当たらず、VERIFY が止めた。
+    #
+    #	https://github.com/zakinko/NetBSD-i386/actions/runs/35039199751
+    #
+    # EnumSet の site は上流に無くなったので消す。POSIX の宣言はここで足す
+    # 値の true が兼ねる。
     (
         "src/main/java/com/google/devtools/build/lib/util/OS.java",
-        '  OPENBSD("openbsd", "OpenBSD"),\n',
-        '  OPENBSD("openbsd", "OpenBSD"),\n'
-        '  NETBSD("netbsd", "NetBSD"),\n'
-        '  DRAGONFLY("dragonfly", "DragonFly"),\n',
-    ),
-    (
-        "src/main/java/com/google/devtools/build/lib/util/OS.java",
-        "EnumSet.of(DARWIN, FREEBSD, OPENBSD, LINUX)",
-        "EnumSet.of(DARWIN, FREEBSD, OPENBSD, NETBSD, DRAGONFLY, LINUX)",
+        '  OPENBSD("openbsd", "OpenBSD", true),\n',
+        '  OPENBSD("openbsd", "OpenBSD", true),\n'
+        '  NETBSD("netbsd", "NetBSD", true),\n'
+        '  DRAGONFLY("dragonfly", "DragonFly", true),\n',
     ),
     (
         "src/main/java/com/google/devtools/build/lib/jni/JniLoader.java",
@@ -320,6 +327,20 @@ def main():
             missing += 1
             continue
         s = open(p, encoding="utf-8").read()
+        if new in s:
+            # 既に当たっている。ここを old の有無で見分けてはいけない。
+            # ほとんどの site は old を anchor として new の中に残すので、
+            # 当たった後も old は在り続ける。それで二度目に当て直し、
+            #
+            #	NETBSD("netbsd", "NetBSD", true),
+            #	DRAGONFLY("dragonfly", "DragonFly", true),
+            #	NETBSD("netbsd", "NetBSD", true),	← 二本目
+            #	DRAGONFLY("dragonfly", "DragonFly", true),
+            #
+            # になり、javac が variable NETBSD is already defined in enum OS
+            # で落ちる。new がそのまま在るかどうかで見る。
+            skipped += 1
+            continue
         if new.split("\n")[0] in s and ("NETBSD" in s or "netbsd" in s):
             # 既に当たっている見込み。old がまだ在れば当て直す。
             if old not in s:
