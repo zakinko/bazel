@@ -514,6 +514,16 @@ fi
 # derived/maven で拾う error_prone の版が upstream の想定より新しいことに
 # よる。BSD への移植とは関わりが無い。踏み台を建てる間は落とす。
 # exec 構成でも建てるので --host_javacopt の方も要る。
+#
+# **この二つは下の java_rules_skylark.bzl の細工と一組である。**
+# --javacopt は JavaBuilder 向けの口だが、その値は
+# tools/build_rules/java_rules_skylark.bzl の genrule から素の javac へも
+# そのまま流れる。javac は -Xep を知らないので
+#
+#	error: invalid flag: -Xep:NullArgumentForNonNullParameter:OFF
+#	ERROR: .../buildjar/BUILD:176:23: JavacBootstrap ...
+#
+# で 1,730 / 6,252 action まで進んでから止まる (master, JDK 25 で実測)。
 A="$A --javacopt=-Xep:NullArgumentForNonNullParameter:OFF"
 
 # DragonFly の clang は module map を持っているので cc_configure が
@@ -885,6 +895,68 @@ if [ "$JAVA_VER" -lt 22 ]; then
 		grep -rnE "$UNNAMED_RE" src/main/java --include='*.java' | head -10
 		exit 1
 	fi
+fi
+
+# 踏み台の java_library は genrule で素の javac を呼び、そこへ --javacopt の
+# 値をそのまま渡す。
+#
+#	tools/build_rules/java_rules_skylark.bzl
+#	  javac_options = ctx.fragments.java.default_javac_flags
+#	  cmd += "%s/bin/javac" % java_runtime.java_home
+#	  cmd += " " + " ".join(javac_options)
+#
+# --javacopt は JavaBuilder 向けの口なので、そこには javac が知らない値が
+# 入る。上で渡している -Xep がそれで、javac は invalid flag として止まる。
+# master を JDK 25 で回して 1,730 / 6,252 action で実際に踏んだ。
+# JavaBuilder には要るので渡すのをやめるわけにいかない。素の javac へ行く
+# ところで落とす。
+#
+# もう一つ、annotation processor も JavaBuilder が面倒を見るものなので、
+# 素の javac では走らない。JDK 23 以降は既定で classpath の processor を
+# 走らせないので、AutoValue の生成 class が無いと言って止まる。
+#
+#	JarOwner.java:37: error: cannot find symbol
+#	  symbol: class AutoValue_JarOwner
+#
+# **こちらは 9.2.0 (pkgsrc の bazel9) で測ったもので、master では踏む前に
+# 別の壁で止まっていて未確認。** file は 9.2.0 と byte 単位で同じなので同じ
+# 筋を通るはずだが、測っていないことは測っていない。-proc:full は 22 以前では
+# 既定と同じで害が無いので、JDK 23 以降のときだけ添える。
+BZL=tools/build_rules/java_rules_skylark.bzl
+if [ -f "$BZL" ]; then
+	echo "=== 踏み台の javac に渡す flag を絞る"
+	if [ "${JAVA_VER}" -ge 23 ]; then
+		EXTRA='+ ["-proc:full"]'
+	else
+		EXTRA=''
+	fi
+	if grep -q 'startswith("-Xep")' "$BZL"; then
+		echo "  既に当たっている"
+	else
+	python3 - "$BZL" "$EXTRA" <<'PY'
+import sys
+p, extra = sys.argv[1], sys.argv[2]
+s = open(p, encoding="utf-8").read()
+old = "    javac_options = ctx.fragments.java.default_javac_flags"
+new = ("    javac_options = [\n"
+       "        f\n"
+       "        for f in ctx.fragments.java.default_javac_flags\n"
+       "        if not f.startswith(\"-Xep\")\n"
+       "    ] " + extra).rstrip()
+if old not in s:
+    sys.exit("java_rules_skylark.bzl の当てる場所が見つからない")
+open(p, "w", encoding="utf-8").write(s.replace(old, new, 1))
+PY
+	[ $? -eq 0 ] || exit 1
+	fi
+	grep -q 'startswith("-Xep")' "$BZL" ||
+		{ echo "-Xep を落とす細工が入っていない"; exit 1; }
+	if [ "${JAVA_VER}" -ge 23 ]; then
+		grep -q '\-proc:full' "$BZL" ||
+			{ echo "-proc:full が入っていない"; exit 1; }
+	fi
+	python3 -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$BZL" 2>/dev/null ||
+		echo "  (Starlark なので python では構文検査できない。bazel が読む)"
 fi
 
 # compile.sh の第二段は derived/maven を @maven の vendored repo として扱い、
