@@ -29,6 +29,17 @@ PROTOC=${PROTOC:-$(command -v protoc || true)}
 [ -x "$PROTOC" ] || { echo "protoc が無い。package を入れる"; exit 1; }
 "$PROTOC" --version
 
+# 下の ${CXX:-clang++} は、base の compiler が clang である BSD を前提に
+# していた。NetBSD の base は GCC なので clang++ という名前が無く、
+#
+#	./ci/master-bootstrap.sh: clang++: not found
+#
+# になる。名前を決め打ちせず、在るものを引いて一度だけ決める。ここで CXX が
+# 立つので、以降の ${CXX:-...} は全部これを使う。
+CXX=${CXX:-$(command -v clang++ || command -v c++ || command -v g++ || echo c++)}
+export CXX
+echo "CXX=$CXX"
+
 # 建てる版は 34.1。grpc-java の HEAD が呼ぶ java::QualifiedClassName が
 # compiler/java/names.h に現れるのは 33.1 からで、31.1 にも 32.1 にも無い。
 # abseil は protobuf の MODULE.bazel が指す版を source から入れるので、
