@@ -833,20 +833,37 @@ fi
 # JDK 21 で建てるときはここだけが引っ掛かる。ほかは 21 で全部通る。pkgsrc も
 # DragonFly の dports も openjdk21 が最新なので、名前を付けて逃げる。
 # master は動くので file 名は決め打ちにせず、木を掃いて置き換える。
+#
+# 形を列挙してはいけない。`var _ =` と `_ ->` の二つだけを見ていたが、上流が
+#
+#	.build((ActionLookupData _) -> new ReaderPreferringReadWriteLock())
+#
+# という型付きの lambda 引数を足した途端に取りこぼし、書き換えの後の検査も
+# 同じ二つしか見ていないので「残っていない」と言い、三分後に javac が落ちた。
+#
+#	https://github.com/zakinko/NetBSD-i386/actions/runs/35041022921
+#
+# 「_ の次に来るもの」で見る。無名変数の後には -> か = か ) か , か : しか
+# 来ない (最後は for (var _ : xs) の形)。前を空白に限ると、文字列の中の
+# "underscores (_); 2)" のような (_) を拾わない。upstream master 2d7ad551c1 で、
+# 本物 7 件をちょうど 7 件拾い、誤検出 0 だった。
+UNNAMED_RE='(^|[[:space:]])_[[:space:]]*(->|=[^=]|\)|,|:)'
 if [ "$JAVA_VER" -lt 22 ]; then
 	echo "=== 無名変数を JDK $JAVA_VER 向けに直す"
 	n=0
-	for f in $(grep -rlE 'var _ =|_ ->' src/main/java --include='*.java' 2>/dev/null); do
-		# 行頭に来る形もあるので、区切りをまとめて見る。
-		sed -i.bak -E -e 's/var _ =/var unused_ =/g' \
-			      -e 's/(^|[(, \t])_ ->/\1unused_ ->/g' "$f"
+	for f in $(grep -rlE "$UNNAMED_RE" src/main/java --include='*.java' 2>/dev/null); do
+		sed -i.bak -E -e 's/(^|[[:space:]])_([[:space:]]*->)/\1unused_\2/g' \
+			      -e 's/(^|[[:space:]])_([[:space:]]*=[^=])/\1unused_\2/g' \
+			      -e 's/(^|[[:space:]])_([[:space:]]*[),:])/\1unused_\2/g' "$f"
 		rm -f "$f.bak"
 		n=$((n+1))
 	done
 	echo "  $n file を直した"
-	if grep -rqE 'var _ =|(^|[(, \t])_ ->' src/main/java --include='*.java' 2>/dev/null; then
-		echo "  まだ残っている:"
-		grep -rnE 'var _ =|(^|[(, \t])_ ->' src/main/java --include='*.java' | head -5
+	# 残ったまま進むと javac が落ちるだけなので、ここで止める。
+	if grep -rqE "$UNNAMED_RE" src/main/java --include='*.java' 2>/dev/null; then
+		echo "  書き換えられなかった無名変数が残っている:"
+		grep -rnE "$UNNAMED_RE" src/main/java --include='*.java' | head -10
+		exit 1
 	fi
 fi
 
