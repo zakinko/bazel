@@ -503,28 +503,33 @@ if [ -z "${STATIC_BSD:-}" ]; then
 	A="$A --host_linkopt=-lm --linkopt=-lm"
 fi
 
-# ErrorProne の NullArgumentForNonNullParameter が立つ。grpc-java でも
-# bazel 自身の net/starlark でも出る。
+# JDK 21 で建てると ErrorProne の NullArgumentForNonNullParameter が立つ。
+# grpc-java でも bazel 自身の net/starlark でも出る。
 #
 #	grpc-java+/api/src/main/java/io/grpc/CallOptions.java:532: error:
 #	  [NullArgumentForNonNullParameter] Null is not permitted for this
 #	  parameter.
 #
-# bazel 自身の code が自分の check に引っかかっているので、これは
-# derived/maven で拾う error_prone の版が upstream の想定より新しいことに
-# よる。BSD への移植とは関わりが無い。踏み台を建てる間は落とす。
-# exec 構成でも建てるので --host_javacopt の方も要る。
+# 偽陽性で、bazelbuild/bazel#30743 そのもの。22 より前の javac は class file
+# から読んだ type-use annotation (@Nullable) を symbol に付けないので
+# (JDK-8225377)、analyzer が引数を non-null と読む。javac の
+# -XDaddTypeAnnotationsToSymbol=true がそれを付けさせる。22 以降は既定で
+# 付くので要らず、上流はこの回避を JavaBuilder に入れない (#30744 は閉じた)
+# と決めたので、toolchain 側で渡す。
 #
-# **この二つは下の java_rules_skylark.bzl の細工と一組である。**
-# --javacopt は JavaBuilder 向けの口だが、その値は
+# -Xep:...:OFF で黙らせてはいけない。--javacopt の値は
 # tools/build_rules/java_rules_skylark.bzl の genrule から素の javac へも
-# そのまま流れる。javac は -Xep を知らないので
+# そのまま流れ、javac は -Xep を知らない (invalid flag で 1,730 / 6,252
+# action まで進んで止まる。master、JDK 25 で実測)。-XD は javac 自身の
+# option なので素の javac も受ける。exec 構成でも建てるので
+# --host_javacopt の方も要る。
 #
-#	error: invalid flag: -Xep:NullArgumentForNonNullParameter:OFF
-#	ERROR: .../buildjar/BUILD:176:23: JavacBootstrap ...
-#
-# で 1,730 / 6,252 action まで進んでから止まる (master, JDK 25 で実測)。
-A="$A --javacopt=-Xep:NullArgumentForNonNullParameter:OFF"
+# 25 で偽陽性が出ないことは #30743 の再現 repo の測定で、ここでは測って
+# いない (JDK 25 の run は手前の Proguard で止まっていた)。
+if [ "${JAVA_VER}" -le 21 ]; then
+	A="$A --javacopt=-XDaddTypeAnnotationsToSymbol=true"
+	A="$A --host_javacopt=-XDaddTypeAnnotationsToSymbol=true"
+fi
 
 # DragonFly の clang は module map を持っているので cc_configure が
 # layering_check を立てる。grpc がその検査に通らない。
@@ -538,7 +543,6 @@ A="$A --javacopt=-Xep:NullArgumentForNonNullParameter:OFF"
 case "$(uname -s)" in
 DragonFly)	A="$A --features=-layering_check" ;;
 esac
-A="$A --host_javacopt=-Xep:NullArgumentForNonNullParameter:OFF"
 
 # rules_java が配る java_tools には singlejar の C++ が入っている。出来合いの
 # binary が在るのは linux/darwin/windows だけなので、BSD では source から
@@ -905,58 +909,21 @@ fi
 #	  cmd += "%s/bin/javac" % java_runtime.java_home
 #	  cmd += " " + " ".join(javac_options)
 #
-# --javacopt は JavaBuilder 向けの口なので、そこには javac が知らない値が
-# 入る。上で渡している -Xep がそれで、javac は invalid flag として止まる。
-# master を JDK 25 で回して 1,730 / 6,252 action で実際に踏んだ。
-# JavaBuilder には要るので渡すのをやめるわけにいかない。素の javac へ行く
-# ところで落とす。
+# JDK 23 以降は既定で classpath の annotation processor を走らせないので、
+# その javac に -proc:full が要る (9.2.0 で実測、AutoValue_JarOwner が無いと
+# 言って 1,778 action で止まる)。master は scripts/bootstrap/bootstrap.sh
+# の _BAZEL_ARGS に --javacopt=-proc:full と --host_javacopt=-proc:full を
+# 持っていて (1bdb57c592、2026-07-20)、それが上の経路でこの javac に届く。
+# ここで .bzl を書き換える必要は無い。
 #
-# もう一つ、annotation processor も JavaBuilder が面倒を見るものなので、
-# 素の javac では走らない。JDK 23 以降は既定で classpath の processor を
-# 走らせないので、AutoValue の生成 class が無いと言って止まる。
-#
-#	JarOwner.java:37: error: cannot find symbol
-#	  symbol: class AutoValue_JarOwner
-#
-# **こちらは 9.2.0 (pkgsrc の bazel9) で測ったもので、master では踏む前に
-# 別の壁で止まっていて未確認。** file は 9.2.0 と byte 単位で同じなので同じ
-# 筋を通るはずだが、測っていないことは測っていない。-proc:full は 22 以前では
-# 既定と同じで害が無いので、JDK 23 以降のときだけ添える。
-BZL=tools/build_rules/java_rules_skylark.bzl
-if [ -f "$BZL" ]; then
-	echo "=== 踏み台の javac に渡す flag を絞る"
-	if [ "${JAVA_VER}" -ge 23 ]; then
-		EXTRA='+ ["-proc:full"]'
-	else
-		EXTRA=''
-	fi
-	if grep -q 'startswith("-Xep")' "$BZL"; then
-		echo "  既に当たっている"
-	else
-	python3 - "$BZL" "$EXTRA" <<'PY'
-import sys
-p, extra = sys.argv[1], sys.argv[2]
-s = open(p, encoding="utf-8").read()
-old = "    javac_options = ctx.fragments.java.default_javac_flags"
-new = ("    javac_options = [\n"
-       "        f\n"
-       "        for f in ctx.fragments.java.default_javac_flags\n"
-       "        if not f.startswith(\"-Xep\")\n"
-       "    ] " + extra).rstrip()
-if old not in s:
-    sys.exit("java_rules_skylark.bzl の当てる場所が見つからない")
-open(p, "w", encoding="utf-8").write(s.replace(old, new, 1))
-PY
-	[ $? -eq 0 ] || exit 1
-	fi
-	grep -q 'startswith("-Xep")' "$BZL" ||
-		{ echo "-Xep を落とす細工が入っていない"; exit 1; }
-	if [ "${JAVA_VER}" -ge 23 ]; then
-		grep -q '\-proc:full' "$BZL" ||
-			{ echo "-proc:full が入っていない"; exit 1; }
-	fi
-	python3 -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$BZL" 2>/dev/null ||
-		echo "  (Starlark なので python では構文検査できない。bazel が読む)"
+# その前提が上流で消えたら黙って通ってしまう (JDK 21 なら要らない flag
+# なので) ので、23 以降で建てるときは flag が在ることを確かめる。
+if [ "${JAVA_VER}" -ge 23 ]; then
+	n=$(grep -c 'javacopt=-proc:full' scripts/bootstrap/bootstrap.sh)
+	[ "$n" -eq 2 ] || {
+		echo "bootstrap.sh の -proc:full が $n 行 (2 のはず)。上流が変えた"
+		exit 1
+	}
 fi
 
 # compile.sh の第二段は derived/maven を @maven の vendored repo として扱い、
