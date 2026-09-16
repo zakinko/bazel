@@ -364,7 +364,27 @@ if [ -n "${STATIC_BSD:-}" ]; then
 elif [ -n "${PATCH859:-}" ]; then
 	OV="$OV rules_cc=$PATCH859"
 fi
-[ -n "${PATCH_RULES_PYTHON:-}" ] && OV="$OV rules_python=$PATCH_RULES_PYTHON"
+# rules_python の当て物は必ず要る。外から渡す口は残すが、既定は隣に在る物。
+#
+# 二つ直している。片方は launcher の "$@" の括り (上の一覧の通り)。もう片方は
+# runtime_env_toolchain_interpreter.sh の export で、こちらが無いと
+#
+#	target '@@rules_python+//python/private:runtime_env_toolchain_interpreter.sh'
+#	  is not visible from
+#	target '@@rules_python+//python/runtime_env_toolchains:_runtime_env_py3_runtime'
+#
+# で //src:bazel_nojdk の analysis ごと落ちる。bazel master は
+# incompatible_no_implicit_file_export の既定が true なので、source file は
+# exports_files で明示しない限り package の外から見えない。rules_python 1.7.0 の
+# python/private/BUILD.bazel はこの file を export していない。
+#
+# BSD だけの話ではないが、この経路を踏むのが BSD だけなので誰も当たっていない。
+# 配られる CPython に BSD 向けが無いので runtime_env_toolchains を使う。
+#
+#	https://github.com/zakinko/NetBSD-i386/actions/runs/35056890878
+#
+# 1.7.0 に fuzz 0 で当たることを確かめてある。
+OV="$OV rules_python=${PATCH_RULES_PYTHON:-$BZ/ci/rules_python_quote_args.patch}"
 # platforms と rules_java の当て物は、fork に置いてある固定の diff では版が
 # 上がった途端に当たらなくなる。実際 rules_java 9.7.2 に対して
 #
