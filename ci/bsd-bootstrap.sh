@@ -139,6 +139,11 @@ uname -a
 for t in bash unzip zip curl python3 go; do
 	printf "%-8s %s\n" "$t" "$(command -v $t 2>/dev/null || echo '(無い)')"
 done
+# POSIX_SH_PATCH を渡されたときは bash を使わない。BSD は base に bash が
+# 無いので、入れずに /bin/sh だけで建つことを測るのがこの道の趣旨である。
+if [ -n "${POSIX_SH_PATCH:-}" ] && command -v bash >/dev/null 2>&1; then
+	echo "(bash が入っているが、この段では使わない)"
+fi
 command -v go >/dev/null 2>&1 && go version && go env GOROOT
 "$JAVA_HOME/bin/java" -version 2>&1 || echo "(java が動かない)"
 
@@ -212,6 +217,24 @@ for d in src scripts tools third_party toolchain_local; do
 	tar cf - "$d" | (cd "$WORK" && tar xf -)
 done
 cp MODULE.bazel "$WORK/MODULE.bazel"
+
+# bootstrap script を POSIX sh 版に差し替える道。BSD は base に bash が無いので、
+# sh だけで建てられるかどうかが実際に効く。bazel 自身が genrule の action に使う
+# shell も既定 /bin/bash なので、そちらも同じ sh に向ける。
+if [ -n "${POSIX_SH_PATCH:-}" ]; then
+	echo "=== bootstrap script を POSIX sh 版に差し替える"
+	[ -f "$POSIX_SH_PATCH" ] || { echo "$POSIX_SH_PATCH が無い"; exit 1; }
+	(cd "$WORK" && patch -p1 -f -i "$POSIX_SH_PATCH" </dev/null) || exit 1
+	for f in compile.sh scripts/bootstrap/compile.sh \
+	         scripts/bootstrap/buildenv.sh scripts/bootstrap/bootstrap.sh \
+	         src/zip_builtins.sh; do
+		head -1 "$WORK/$f" | grep -q '^#!/bin/sh$' \
+			|| { echo "$f の shebang が #!/bin/sh でない"; exit 1; }
+	done
+	BAZEL_SH=${BAZEL_SH:-/bin/sh}
+	EXTRA_BAZEL_ARGS="$EXTRA_BAZEL_ARGS --shell_executable=$BAZEL_SH"
+	echo "  4 本を差し替えた。shell は $BAZEL_SH"
+fi
 
 echo "=== 建てる"
 cd "$WORK"
