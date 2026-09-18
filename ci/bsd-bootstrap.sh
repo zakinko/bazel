@@ -7,13 +7,18 @@ set -e
 
 : "${SRCDIR:?SRCDIR is not set}"
 : "${JAVA_HOME:?JAVA_HOME is not set}"
-DIST_URL=https://github.com/bazelbuild/bazel/releases/download/9.2.0/bazel-9.2.0-dist.zip
+# どの release の dist を建てるか。既定は 9.2.0 のまま。9.3.0rc2 のような
+# release candidate を渡せば、その版が BSD で建つかを出る前に測れる。
+DIST_VER=${DIST_VER:-9.2.0}
+DIST_URL=https://github.com/bazelbuild/bazel/releases/download/${DIST_VER}/bazel-${DIST_VER}-dist.zip
 WORK=${WORK:-/tmp/bazel-dist}
 
 export JAVA_HOME
 export JAVA_VERSION=21
-export EMBED_LABEL=9.2.0
-export BAZEL_DEV_VERSION_OVERRIDE=9.2.0
+# EMBED_LABEL と BAZEL_DEV_VERSION_OVERRIDE は版の綴りをそのまま使う。
+# 建った bazel が version で何と答えるかが、どの dist を建てたかの証拠になる。
+export EMBED_LABEL=$DIST_VER
+export BAZEL_DEV_VERSION_OVERRIDE=$DIST_VER
 export SOURCE_DATE_EPOCH=1784438615
 export BAZEL_JAVAC_OPTS="-J-Xmx2g -J-Xms256m"
 
