@@ -163,6 +163,23 @@ fi
 # には --host_action_env でないと届かない。
 EXTRA_BAZEL_ARGS="$EXTRA_BAZEL_ARGS --action_env=PATH=$PATH --host_action_env=PATH=$PATH"
 
+# bazel は genrule の action を既定で /bin/bash で走らせる。BSD は base に bash を
+# 持たず、package は /usr/pkg/bin か /usr/local/bin へ入れるので、素の木では
+# 最初の genrule (tools/osx:xcode-locator-genrule。非 Darwin では stub を cp する
+# だけ) が
+#	Cannot run program "/bin/bash": Exec failed, error: 2
+# で落ちる。source を触らずに越えられる話なので、在る場所を教える。
+# POSIX sh の段は自分で --shell_executable を立てるので触らない。
+if [ ! -x /bin/bash ] && [ -z "${POSIX_SH_PATCH:-}" ]; then
+	BASH_PATH=$(command -v bash 2>/dev/null || true)
+	if [ -n "$BASH_PATH" ]; then
+		EXTRA_BAZEL_ARGS="$EXTRA_BAZEL_ARGS --shell_executable=$BASH_PATH"
+		echo "/bin/bash が無いので genrule の shell を $BASH_PATH にする"
+	else
+		echo "/bin/bash も bash も無い。genrule は落ちる"
+	fi
+fi
+
 export EXTRA_BAZEL_ARGS
 echo "EXTRA_BAZEL_ARGS=$EXTRA_BAZEL_ARGS"
 
