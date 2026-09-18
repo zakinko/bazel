@@ -209,6 +209,13 @@ echo "=== この枝の変更を被せる"
 if [ -n "$PLAIN" ]; then
 	echo "PLAIN=1 なので被せない。素の $DIST_URL を建てる"
 	cd "$WORK"
+	# 素の木に、上流 master の直しを一枚だけ当てて測りたいことがある。
+	# 「この一行を戻せばこの箱で建つ」が言えるのは、当てた run が在るときだけ。
+	if [ -n "${STOCK_PATCH:-}" ]; then
+		[ -f "$STOCK_PATCH" ] || { echo "$STOCK_PATCH が無い"; exit 1; }
+		echo "素の木に $STOCK_PATCH を当てる"
+		patch -p1 -f -i "$STOCK_PATCH" </dev/null || exit 1
+	fi
 	# rules_cc の当て物だけを当てる。PR 859 の形をそのまま使う。
 	if [ -n "$PATCH859" ]; then
 		mkdir -p toolchain_local
