@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 # Copyright 2014 The Bazel Authors. All rights reserved.
 #
@@ -33,7 +33,7 @@ cd "$(dirname "$0")"
 unset MSYS_NO_PATHCONV
 unset MSYS2_ARG_CONV_EXCL
 
-source scripts/bootstrap/buildenv.sh
+. scripts/bootstrap/buildenv.sh
 
 mkdir -p output
 : ${BAZEL:=}
@@ -43,7 +43,7 @@ mkdir -p output
 #
 if [ ! -x "${BAZEL}" ]; then
   new_step 'Building Bazel from scratch'
-  source scripts/bootstrap/compile.sh
+  . scripts/bootstrap/compile.sh
 fi
 
 #
@@ -55,7 +55,7 @@ if [ "${EMBED_LABEL-x}" = "x" ]; then
   EMBED_LABEL="$(get_last_version) (@${git_sha1:-non-git})"
 fi
 
-source scripts/bootstrap/bootstrap.sh
+. scripts/bootstrap/bootstrap.sh
 
 new_step 'Building Bazel with Bazel'
 display "."
