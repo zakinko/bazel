@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 # Copyright 2015 The Bazel Authors. All rights reserved.
 #
@@ -23,11 +23,6 @@
 : ${BAZELRC:="/dev/null"}
 : ${EMBED_LABEL:=""}
 : ${SOURCE_DATE_EPOCH:=""}
-
-EMBED_LABEL_ARG=()
-if [ -n "${EMBED_LABEL}" ]; then
-    EMBED_LABEL_ARG=(--stamp --embed_label "${EMBED_LABEL}")
-fi
 
 : ${JAVA_VERSION:="25"}
 
@@ -61,16 +56,16 @@ _BAZEL_ARGS="--spawn_strategy=standalone \
 cp scripts/bootstrap/BUILD.bootstrap scripts/bootstrap/BUILD
 
 if [ -z "${BAZEL-}" ]; then
-  function _run_bootstrapping_bazel() {
-    local command=$1
+  _run_bootstrapping_bazel() {
+    local command="$1"
     shift
     run_bazel_jar $command \
         ${_BAZEL_ARGS} --verbose_failures \
         --javacopt="-g" "${@}"
   }
 else
-  function _run_bootstrapping_bazel() {
-    local command=$1
+  _run_bootstrapping_bazel() {
+    local command="$1"
     shift
     ${BAZEL} --bazelrc=${BAZELRC} ${BAZEL_DIR_STARTUP_OPTIONS} $command \
         ${_BAZEL_ARGS} --verbose_failures \
@@ -78,10 +73,16 @@ else
   }
 fi
 
-function bazel_build() {
-  _run_bootstrapping_bazel build "${EMBED_LABEL_ARG[@]}" "$@"
+# There are no arrays in POSIX sh, so the optional --embed_label flags are
+# spelled out in both branches instead of being collected in one.
+bazel_build() {
+  if [ -n "${EMBED_LABEL}" ]; then
+    _run_bootstrapping_bazel build --stamp --embed_label "${EMBED_LABEL}" "$@"
+  else
+    _run_bootstrapping_bazel build "$@"
+  fi
 }
 
-function get_bazel_bin_path() {
+get_bazel_bin_path() {
   _run_bootstrapping_bazel info "bazel-bin" || echo "bazel-bin"
 }
