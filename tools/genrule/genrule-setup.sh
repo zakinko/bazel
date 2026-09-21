@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 # Copyright 2017 The Bazel Authors. All rights reserved.
 #
@@ -20,5 +20,5 @@ set -e
 # treat unset variables as errors
 set -u
 
-# exit code of a pipeline is 0, or the non-zero exit code of the rightmost failing command
-set -o pipefail
+# pipefail is not in POSIX sh, so a pipeline reports the status of its last
+# command only.  Nothing here pipes into a command that could hide a failure.

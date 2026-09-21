@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 #
 # Copyright 2025 The Bazel Authors. All rights reserved.
 #
@@ -16,9 +16,9 @@
 #
 # Generates jvm_module_options.h from a deploy jar's manifest.
 
-set -euo pipefail
+set -eu
 
-if [[ $# -ne 2 ]]; then
+if [ $# -ne 2 ]; then
   echo "Usage: $0 <jar_file> <output_file>" >&2
   exit 1
 fi
@@ -41,7 +41,7 @@ inline std::vector<std::string> getJvmModuleOptions() {
   return {
 EOF
 
-if [[ -f "${JAR_FILE}" ]]; then
+if [ -f "${JAR_FILE}" ]; then
   # Extract options from manifest:
   # We first join continuation lines in the manifest, then grep for the headers we
   # care about, and then process them.
@@ -49,15 +49,19 @@ if [[ -f "${JAR_FILE}" ]]; then
       tr -d '\r' | sed -e ':a' -e 'N' -e '$!ba' -e 's/\n / /g' | \
       grep -E '^(Add-Exports|Add-Opens):' | \
       while read -r line; do
-          if [[ "$line" =~ ^Add-Exports: ]]; then
+          case "$line" in
+          Add-Exports:*)
               key="--add-exports"
               values="${line#Add-Exports: }"
-          elif [[ "$line" =~ ^Add-Opens: ]]; then
+              ;;
+          Add-Opens:*)
               key="--add-opens"
               values="${line#Add-Opens: }"
-          else
+              ;;
+          *)
               continue
-          fi
+              ;;
+          esac
           for val in $values; do
               echo "    \"$key\", \"$val=ALL-UNNAMED\"," >> "${OUTPUT_FILE}"
           done

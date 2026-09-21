@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 #
 # Copyright 2015 The Bazel Authors. All rights reserved.
 #
@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -euo pipefail
+set -eu
 
 # This script creates the Bazel archive that Bazel client unpacks and then
 # starts the server from.
@@ -26,11 +26,11 @@ DEPLOY_JAR=$1; shift
 INSTALL_BASE_KEY=$1; shift
 PLATFORMS_ARCHIVE=$1; shift
 
-if [[ "$OUT" == *jdk_allmodules.zip ]]; then
-  DEV_BUILD=1
-else
-  DEV_BUILD=0
-fi
+# [ ] compares strings, not globs; case is how POSIX sh matches a suffix.
+case "$OUT" in
+*jdk_allmodules.zip) DEV_BUILD=1 ;;
+*) DEV_BUILD=0 ;;
+esac
 
 TMP_DIR=${TMPDIR:-/tmp}
 ROOT="$(mktemp -d ${TMP_DIR%%/}/bazel.XXXXXXXX)"
@@ -43,7 +43,7 @@ trap "rm -fr ${ROOT}" EXIT
 
 cp $* ${PACKAGE_DIR}
 
-if [[ $DEV_BUILD -eq 0 ]]; then
+if [ $DEV_BUILD -eq 0 ]; then
   # Unpack the deploy jar for postprocessing and for "re-compressing" to save
   # ~10% of final binary size.
   mkdir -p $RECOMP
@@ -59,13 +59,13 @@ if [[ $DEV_BUILD -eq 0 ]]; then
   # info.
   bazel_label="$(\
     (grep '^build.label=' build-data.properties | cut -d'=' -f2- | tr -d '\n') \
-        || echo -n 'no_version')"
+        || printf '%s' 'no_version')"
 
   cd "$WORKDIR"
 
   DEPLOY_JAR="$DEPLOY_UNCOMP"
 fi
-echo -n "${bazel_label:-no_version}" > "${PACKAGE_DIR}/build-label.txt"
+printf "%s" "${bazel_label:-no_version}" > "${PACKAGE_DIR}/build-label.txt"
 
 if [ -n "${EMBEDDED_TOOLS}" ]; then
   mkdir ${PACKAGE_DIR}/embedded_tools
@@ -96,7 +96,7 @@ cp $INSTALL_BASE_KEY $PACKAGE_DIR/install_base_key
 # Zero timestamps.
 (cd $PACKAGE_DIR; xargs touch -t 198001010000.00) < $FILE_LIST
 
-if [[ "$DEV_BUILD" -eq 1 ]]; then
+if [ "$DEV_BUILD" -eq 1 ]; then
   # Create output zip with lowest compression, but fast.
   ZIP_ARGS="-q1DX@"
 else
