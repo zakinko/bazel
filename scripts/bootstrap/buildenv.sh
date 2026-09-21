@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 # Copyright 2015 The Bazel Authors. All rights reserved.
 #
@@ -66,9 +66,9 @@ fi
 
 # We define the fail function early so we can use it when detecting the JDK
 # See https://github.com/bazelbuild/bazel/issues/2949,
-function fail() {
-  local exitCode=$?
-  if [[ "$exitCode" = "0" ]]; then
+fail() {
+  local exitCode="$?"
+  if [ "$exitCode" = "0" ]; then
     exitCode=1
   fi
   echo >&2
@@ -77,9 +77,11 @@ function fail() {
 }
 
 
-# Set standard variables
-DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-WORKSPACE_DIR="$(dirname "$(dirname "${DIR}")")"
+# Set standard variables.  POSIX sh has no equivalent of BASH_SOURCE, but this
+# file is sourced from the workspace root (compile.sh cds there first), so the
+# tree layout gives us the directories.
+WORKSPACE_DIR="$(pwd)"
+DIR="${WORKSPACE_DIR}/scripts/bootstrap"
 
 JAVA_VERSION=${JAVA_VERSION:-25}
 BAZELRC=${BAZELRC:-"/dev/null"}
@@ -105,7 +107,7 @@ openbsd)
   ;;
 
 darwin)
-  if [[ -z "$JAVA_HOME" ]]; then
+  if [ -z "$JAVA_HOME" ]; then
     JAVA_HOME="$(/usr/libexec/java_home -v ${JAVA_VERSION}+ 2> /dev/null)" \
       || fail "Could not find JAVA_HOME, please ensure a JDK (version ${JAVA_VERSION}+) is installed."
   fi
@@ -118,11 +120,12 @@ msys*|mingw*|cygwin*)
   # Find the latest available version of the SDK.
   JAVA_HOME="${JAVA_HOME:-$(ls -d C:/Program\ Files/Java/jdk* | sort | tail -n 1)}"
   # Replace backslashes with forward slashes.
-  JAVA_HOME="${JAVA_HOME//\\//}"
+  # POSIX sh has no ${var//pat/rep}; tr does the same for one character.
+  JAVA_HOME="$(printf '%s' "${JAVA_HOME}" | tr '\\' /)"
 esac
 
 EXE_EXT=""
-if [ "${PLATFORM}" == "windows" ]; then
+if [ "${PLATFORM}" = "windows" ]; then
   # Extension for executables.
   EXE_EXT=".exe"
 
@@ -143,7 +146,7 @@ ATEXIT_HANDLERS=
 #
 # The handlers will be invoked at exit time in the order they were registered.
 # See comments in run_atexit for more details.
-function atexit() {
+atexit() {
   local handler="${1}"; shift
 
   [ -n "${ATEXIT_HANDLERS}" ] || trap 'run_atexit_handlers $?' EXIT
@@ -155,7 +158,7 @@ function atexit() {
 # If the program exited with an error, this exit routine will also exit with the
 # same error.  However, if the program exited successfully, this exit routine
 # will only exit successfully if the atexit handlers succeed.
-function run_atexit_handlers() {
+run_atexit_handlers() {
   local exit_code="$?"
 
   local failed=no
@@ -176,20 +179,20 @@ function run_atexit_handlers() {
   fi
 }
 
-function tempdir() {
-  local tmp=${TMPDIR:-/tmp}
+tempdir() {
+  local tmp="${TMPDIR:-/tmp}"
   mkdir -p "${tmp}"
   local DIR="$(mktemp -d "${tmp%%/}/bazel_XXXXXXXX")"
   mkdir -p "${DIR}"
-  local DIRBASE=$(basename "${DIR}")
-  eval "cleanup_tempdir_${DIRBASE}() { rm -rf '${DIR}' >&/dev/null || true ; }"
+  local DIRBASE="$(basename "${DIR}")"
+  eval "cleanup_tempdir_${DIRBASE}() { rm -rf '${DIR}' >/dev/null 2>&1 || true ; }"
   atexit cleanup_tempdir_${DIRBASE}
   NEW_TMPDIR="${DIR}"
 }
 tempdir
 OUTPUT_DIR=${NEW_TMPDIR}
 phasefile=${OUTPUT_DIR}/phase
-function cleanup_phasefile() {
+cleanup_phasefile() {
   if [ -f "${phasefile}" ]; then
     echo 1>&2;
     cat "${phasefile}" 1>&2;
@@ -204,7 +207,7 @@ atexit cleanup_phasefile
 # If VERBOSE is no, the command's output is only displayed in case of failure.
 #
 # Exits the script if the command fails.
-function run() {
+run() {
   if [ "${VERBOSE}" = yes ]; then
     echo "${@}"
     "${@}" || exit $?
@@ -213,25 +216,34 @@ function run() {
 
     echo "${@}" >"${errfile}"
     if ! "${@}" >>"${errfile}" 2>&1; then
-      local exitcode=$?
+      local exitcode="$?"
       cat "${errfile}" 1>&2
       exit $exitcode
     fi
   fi
 }
 
-function display() {
-  if [[ -z "${QUIETMODE}" ]]; then
-    echo -e "$@" >&2
+# "echo -e" and "echo -n" are not portable (some shells print the flag), so
+# printf does the escape expansion and the missing newline instead.  A leading
+# -n argument is still honoured, since new_step passes one.
+display() {
+  if [ -n "${QUIETMODE}" ]; then
+    return 0
+  fi
+  if [ "$1" = "-n" ]; then
+    shift
+    printf '%b' "$*" >&2
+  else
+    printf '%b\n' "$*" >&2
   fi
 }
 
-function log() {
-  echo -n "." >&2
+log() {
+  printf '.' >&2
   echo "$1" >${phasefile}
 }
 
-function clear_log() {
+clear_log() {
   echo >&2
   rm -f ${phasefile}
 }
@@ -241,7 +253,7 @@ INFO="\033[32mINFO\033[0m:"
 WARNING="\033[31mWARN\033[0m:"
 
 first_step=1
-function new_step() {
+new_step() {
   rm -f ${phasefile}
   local new_line=
   if [ -n "${first_step}" ]; then
@@ -256,13 +268,13 @@ function new_step() {
   fi
 }
 
-function git_sha1() {
+git_sha1() {
   if [ -x "$(which git 2>/dev/null)" ] && [ -d .git ]; then
     git rev-parse --short HEAD 2>/dev/null || true
   fi
 }
 
-function git_date() {
+git_date() {
   if [ -x "$(which git 2>/dev/null)" ] && [ -d .git ]; then
     git log -1 --pretty=%ai | cut -d " " -f 1 || true
   fi
@@ -270,9 +282,9 @@ function git_date() {
 
 # Get the latest release version and append the date of
 # the last commit if any.
-function get_last_version() {
+get_last_version() {
   if [ -f "MODULE.bazel" ]; then
-    local version=$(grep "version =" MODULE.bazel | head -n 1 | sed 's/.*version = "\(.*\)".*/\1/' | cut -d '"' -f2)
+    local version="$(grep "version =" MODULE.bazel | head -n 1 | sed 's/.*version = "\(.*\)".*/\1/' | cut -d '"' -f2)"
   else
     local version=""
   fi
@@ -287,12 +299,12 @@ function get_last_version() {
   echo "${version}-${date}"
 }
 
-if [[ ${PLATFORM} == "darwin" ]]; then
-  function md5_file() {
+if [ ${PLATFORM} = "darwin" ]; then
+  md5_file() {
     echo $(cat $1 | md5) $1
   }
 else
-  function md5_file() {
+  md5_file() {
     md5sum $1
   }
 fi
@@ -300,15 +312,18 @@ fi
 # Gets the java version from JAVA_HOME
 # Sets JAVAC and JAVAC_VERSION with respectively the path to javac and
 # the version of javac.
-function get_java_version() {
+get_java_version() {
   test -z "$JAVA_HOME" && fail "JDK not found, please set \$JAVA_HOME."
   JAVAC="${JAVA_HOME}/bin/javac"
-  [[ -x "${JAVAC}" ]] \
+  [ -x "${JAVAC}" ] \
     || fail "JAVA_HOME ($JAVA_HOME) is not a path to a working JDK."
 
   JAVAC_VERSION=$("${JAVAC}" -version 2>&1)
-  if [[ "$JAVAC_VERSION" =~ javac\ ((1\.)?([789]|[1-9][0-9])).*$ ]]; then
-    JAVAC_VERSION=1.${BASH_REMATCH[3]}
+  # POSIX sh has no =~ and no BASH_REMATCH; sed pulls out the same group.
+  local javac_major="$(printf '%s' "$JAVAC_VERSION" | \
+    sed -nE 's/^javac (1\.)?([789]|[1-9][0-9]).*/\2/p')"
+  if [ -n "$javac_major" ]; then
+    JAVAC_VERSION=1.${javac_major}
   else
     fail \
       "Cannot determine JDK version, please set \$JAVA_HOME.\n" \
@@ -317,35 +332,35 @@ function get_java_version() {
 }
 
 # Return the target that a bind point to, using Bazel query.
-function get_bind_target() {
+get_bind_target() {
   $BAZEL --bazelrc=${BAZELRC} ${BAZEL_DIR_STARTUP_OPTIONS} \
     query "deps($1, 1) - $1"
 }
 
 # Create a link for a directory on the filesystem
-function link_dir() {
-  local source=$1
-  local dest=$2
+link_dir() {
+  local source="$1"
+  local dest="$2"
 
-  if [[ "${PLATFORM}" == "windows" ]]; then
-    local -r s="$(cygpath -w "$source")"
-    local -r d="$(cygpath -w "$dest")"
+  if [ "${PLATFORM}" = "windows" ]; then
+    local s="$(cygpath -w "$source")"
+    local d="$(cygpath -w "$dest")"
     powershell -command "New-Item -ItemType Junction -Path '$d' -Value '$s'"
   else
     ln -s "${source}" "${dest}"
   fi
 }
 
-function link_file() {
-  local source=$1
-  local dest=$2
+link_file() {
+  local source="$1"
+  local dest="$2"
 
-  if [[ "${PLATFORM}" == "windows" ]]; then
+  if [ "${PLATFORM}" = "windows" ]; then
     # Attempt creating a symlink to the file. This is supported without
     # elevation (Administrator privileges) on Windows 10 version 1709 when
     # Developer Mode is enabled.
-    local -r s="$(cygpath -w "$source")"
-    local -r d="$(cygpath -w "$dest")"
+    local s="$(cygpath -w "$source")"
+    local d="$(cygpath -w "$dest")"
     if ! powershell -command "New-Item -ItemType SymbolicLink -Path '$d' -Value '$s'"; then
       # If the previous call failed to create a symlink, just copy the file.
       cp "$source" "$dest"
@@ -362,20 +377,20 @@ function link_file() {
 #   ${BAZEL_TOOLS_REPO}/tools/android -> $PWD/tools/android
 #   ${BAZEL_TOOLS_REPO}/tools/bash -> $PWD/tools/bash
 #   ... and so on for all files and directories directly under "tools".
-function link_children() {
-  local -r source_dir=${1%/}
-  local -r source_subdir=${2%/}
-  local -r dest_dir=${3%/}
+link_children() {
+  local source_dir=${1%/}
+  local source_subdir=${2%/}
+  local dest_dir=${3%/}
 
   for e in $(find "${source_dir}/${source_subdir}" -mindepth 1 -maxdepth 1 -type d); do
     local dest_path="${dest_dir}/${e#$source_dir/}"
-    if [[ ! -d "$dest_path" ]]; then
+    if [ ! -d "$dest_path" ]; then
       link_dir "$e" "$dest_path"
     fi
   done
   for e in $(find "${source_dir}/${source_subdir}" -mindepth 1 -maxdepth 1 -type f); do
     local dest_path="${dest_dir}/${e#$source_dir/}"
-    if [[ ! -f "$dest_path" ]]; then
+    if [ ! -f "$dest_path" ]; then
       link_file "$e" "$dest_path"
     fi
   done
