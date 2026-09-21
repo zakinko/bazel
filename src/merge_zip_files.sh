@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 # Copyright 2019 The Bazel Authors. All rights reserved.
 #
@@ -42,7 +42,7 @@
 # dir1/a1.cc
 # dir2/b1.cc
 
-set -euo pipefail
+set -eu
 
 directory_prefix="$1"; shift
 output="$1"; shift
@@ -53,7 +53,7 @@ tmp_dir=$(mktemp -d -t 'tmp_bazel_zip_files_XXXXXX')
 trap "rm -fr $tmp_dir" EXIT
 tmp_zip="$tmp_dir/archive.zip"
 
-if [[ "$directory_prefix" == "-" ]]; then
+if [ "$directory_prefix" = "-" ]; then
   for curr_zip in "$@"
   do
     unzip -q -o "$curr_zip" -d "$tmp_dir"

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 # Copyright 2019 The Bazel Authors. All rights reserved.
 #
@@ -24,7 +24,7 @@
 # src/main/cpp/a.cc
 # src/main/cpp/b.cc
 
-set -euo pipefail
+set -eu
 
 directory_prefix="$1"; shift
 output="$1"; shift
