@@ -140,9 +140,11 @@ public abstract class GenRuleBase implements RuleConfiguredTargetFactory {
 
     if (cmdType == CommandType.BASH) {
       // Add the genrule environment setup script before the actual shell command.
+      // "." rather than "source": the latter is a bash extension, and a POSIX
+      // sh reports it as not found and carries on without the setup.
       command =
           String.format(
-              "source %s; %s",
+              ". %s; %s",
               ruleContext.getPrerequisiteArtifact("$genrule_setup").getExecPath(), command);
     }
 
