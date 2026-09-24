@@ -87,7 +87,7 @@ public class BazelRuleClassProvider {
     public abstract void setUseStrictActionEnv(boolean value);
   }
 
-  private static final PathFragment FALLBACK_SHELL = PathFragment.create("/bin/bash");
+  private static final PathFragment FALLBACK_SHELL = PathFragment.create("/bin/sh");
 
   @VisibleForTesting
   public static final ImmutableMap<OS, PathFragment> SHELL_EXECUTABLES =
@@ -131,9 +131,16 @@ public class BazelRuleClassProvider {
     // TODO(ulfjack): instead of using the OS Bazel runs on, we need to use the exec platform,
     // which may be different for remote execution. For now, this can be overridden with
     // --shell_executable, so at least there's a workaround.
-    return getDefaultPathFromOptions(options) != null
-        ? getDefaultPathFromOptions(options)
-        : SHELL_EXECUTABLES.getOrDefault(os, FALLBACK_SHELL);
+    PathFragment fromOptions = getDefaultPathFromOptions(options);
+    if (fromOptions != null) {
+      return fromOptions;
+    }
+    // Go through ShellConfiguration rather than reading SHELL_EXECUTABLES here, so that the
+    // action environment and the shell a genrule runs under are decided by the same rule.
+    // ShToolchain, which is what genrules go through, already calls it.
+    return ShellConfiguration.getShellExecutable(os)
+        .or(() -> ShellConfiguration.getShellExecutable(OS.UNKNOWN))
+        .orElse(FALLBACK_SHELL);
   }
 
   public static final Function<BuildOptions, ActionEnvironment> SHELL_ACTION_ENV =
