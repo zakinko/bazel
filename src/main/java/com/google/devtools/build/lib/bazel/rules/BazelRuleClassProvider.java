@@ -87,18 +87,7 @@ public class BazelRuleClassProvider {
     public abstract void setUseStrictActionEnv(boolean value);
   }
 
-  private static final PathFragment FALLBACK_SHELL = PathFragment.create("/bin/bash");
-
-  @VisibleForTesting
-  public static final ImmutableMap<OS, PathFragment> SHELL_EXECUTABLES =
-      ImmutableMap.<OS, PathFragment>builder()
-          .put(OS.WINDOWS, PathFragment.create("c:/msys64/usr/bin/bash.exe"))
-          .put(OS.FREEBSD, PathFragment.create("/usr/local/bin/bash"))
-          .put(OS.OPENBSD, PathFragment.create("/usr/local/bin/bash"))
-          .put(OS.LINUX, PathFragment.create("/bin/bash"))
-          .put(OS.DARWIN, PathFragment.create("/bin/bash"))
-          .put(OS.UNKNOWN, FALLBACK_SHELL)
-          .buildOrThrow();
+  private static final PathFragment FALLBACK_SHELL = PathFragment.create("/bin/sh");
 
   /**
    * {@link com.google.devtools.build.lib.skyframe.config.BuildConfigurationFunction} constructs
@@ -131,9 +120,11 @@ public class BazelRuleClassProvider {
     // TODO(ulfjack): instead of using the OS Bazel runs on, we need to use the exec platform,
     // which may be different for remote execution. For now, this can be overridden with
     // --shell_executable, so at least there's a workaround.
-    return getDefaultPathFromOptions(options) != null
-        ? getDefaultPathFromOptions(options)
-        : SHELL_EXECUTABLES.getOrDefault(os, FALLBACK_SHELL);
+    PathFragment fromOptions = getDefaultPathFromOptions(options);
+    if (fromOptions != null) {
+      return fromOptions;
+    }
+    return ShellConfiguration.getShellExecutable(os).orElse(FALLBACK_SHELL);
   }
 
   public static final Function<BuildOptions, ActionEnvironment> SHELL_ACTION_ENV =
@@ -231,7 +222,7 @@ public class BazelRuleClassProvider {
         @Override
         public void init(ConfiguredRuleClassProvider.Builder builder) {
           ShellConfiguration.injectShellExecutableFinder(
-              BazelRuleClassProvider::getDefaultPathFromOptions, SHELL_EXECUTABLES);
+              BazelRuleClassProvider::getDefaultPathFromOptions);
           builder
               .setPrelude("//tools/build_rules:prelude_bazel")
               .setRunfilesPrefix("_main")

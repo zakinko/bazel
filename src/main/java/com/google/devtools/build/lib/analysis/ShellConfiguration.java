@@ -13,6 +13,8 @@
 // limitations under the License.
 package com.google.devtools.build.lib.analysis;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.devtools.build.lib.analysis.config.BuildOptions;
 import com.google.devtools.build.lib.analysis.config.Fragment;
 import com.google.devtools.build.lib.analysis.config.FragmentOptions;
@@ -24,7 +26,8 @@ import com.google.devtools.common.options.Option;
 import com.google.devtools.common.options.OptionDocumentationCategory;
 import com.google.devtools.common.options.OptionEffectTag;
 import com.google.devtools.common.options.OptionsClass;
-import java.util.Map;
+import java.io.File;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 import javax.annotation.Nullable;
@@ -33,7 +36,29 @@ import javax.annotation.Nullable;
 @RequiresOptions(options = {ShellConfiguration.Options.class})
 public class ShellConfiguration extends Fragment {
 
-  private static Map<OS, PathFragment> shellExecutables;
+  /** What each platform usually has, used when asked about an exec platform that is not this one. */
+  private static final ImmutableMap<OS, PathFragment> DECLARED =
+      ImmutableMap.of(
+          OS.WINDOWS, PathFragment.create("c:/msys64/usr/bin/bash.exe"),
+          OS.FREEBSD, PathFragment.create("/usr/local/bin/bash"),
+          OS.OPENBSD, PathFragment.create("/usr/local/bin/bash"),
+          OS.LINUX, PathFragment.create("/bin/bash"),
+          OS.DARWIN, PathFragment.create("/bin/bash"),
+          OS.UNKNOWN, PathFragment.create("/bin/sh"));
+
+  /**
+   * Where a bash may be found, in the order they are tried. /bin/bash is where Linux and macOS
+   * keep one; /usr/local/bin/bash is where the FreeBSD and OpenBSD ports put it; the last is
+   * MSYS2 on Windows, which is the only platform here with no /bin/sh to fall back to.
+   */
+  private static final ImmutableList<PathFragment> BASH_CANDIDATES =
+      ImmutableList.of(
+          PathFragment.create("/bin/bash"),
+          PathFragment.create("/usr/local/bin/bash"),
+          PathFragment.create("c:/msys64/usr/bin/bash.exe"));
+
+  /** Present on every system Bazel runs on except Windows. */
+  private static final PathFragment POSIX_SHELL = PathFragment.create("/bin/sh");
 
   private static Function<Options, PathFragment> optionsBasedDefault;
 
@@ -42,13 +67,12 @@ public class ShellConfiguration extends Fragment {
    * locating the correct sh executable given a set of target constraints.
    */
   public static void injectShellExecutableFinder(
-      Function<Options, PathFragment> shellFromOptionsFinder, Map<OS, PathFragment> osToShellMap) {
+      Function<Options, PathFragment> shellFromOptionsFinder) {
     // It'd be nice not to have to set a global static field. But there are so many disparate calls
     // to getShellExecutables() (in both the build's analysis phase and in the run command) that
     // feeding this through instance variables is unwieldy. Fortunately this info is a function of
     // the Blaze implementation and not something that might change between builds.
     optionsBasedDefault = shellFromOptionsFinder;
-    shellExecutables = osToShellMap;
   }
 
   @Nullable private final PathFragment defaultShellExecutableFromOptions;
@@ -58,8 +82,21 @@ public class ShellConfiguration extends Fragment {
         optionsBasedDefault.apply(buildOptions.get(Options.class));
   }
 
-  static Optional<PathFragment> getShellExecutable(OS os) {
-    return Optional.ofNullable(shellExecutables.get(os));
+  public static Optional<PathFragment> getShellExecutable(OS os) {
+    // Only for the machine this is running on. os can describe a different exec platform, and
+    // what is installed here says nothing about what is installed there, so for anything else
+    // keep naming the path that platform usually has.
+    if (os != OS.getCurrent()) {
+      return Optional.ofNullable(DECLARED.get(os));
+    }
+    for (PathFragment candidate : BASH_CANDIDATES) {
+      if (new File(candidate.getPathString()).canExecute()) {
+        return Optional.of(candidate);
+      }
+    }
+    // No bash anywhere. On Windows there is no /bin/sh either, but Bazel needs MSYS2 there in
+    // any case, so the last candidate above is what a working install has.
+    return os == OS.WINDOWS ? Optional.empty() : Optional.of(POSIX_SHELL);
   }
 
   /* Returns the default shell from build options if set explicitly. */
