@@ -24,6 +24,7 @@ import com.google.devtools.common.options.Option;
 import com.google.devtools.common.options.OptionDocumentationCategory;
 import com.google.devtools.common.options.OptionEffectTag;
 import com.google.devtools.common.options.OptionsClass;
+import java.io.File;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -58,8 +59,30 @@ public class ShellConfiguration extends Fragment {
         optionsBasedDefault.apply(buildOptions.get(Options.class));
   }
 
-  static Optional<PathFragment> getShellExecutable(OS os) {
-    return Optional.ofNullable(shellExecutables.get(os));
+  /**
+   * The shell to use where the one named for the platform is not installed. Every system Bazel
+   * runs on other than Windows has /bin/sh; not all of them have a bash.
+   */
+  private static final PathFragment POSIX_SHELL = PathFragment.create("/bin/sh");
+
+  public static Optional<PathFragment> getShellExecutable(OS os) {
+    PathFragment shell = shellExecutables.get(os);
+    if (shell == null) {
+      return Optional.empty();
+    }
+    // The map names a bash, and on three of the five platforms in it that is a path a package
+    // manager provides rather than the system: MSYS2 on Windows, ports on the BSDs. On Linux it
+    // is /bin/bash, which the distributions carrying bash as an essential package have and an
+    // Alpine image does not have at all. Where that bash is not installed, use the shell that is.
+    // Windows is left alone: there is no /bin/sh there to fall back to.
+    // Only for the machine this is running on. os can describe a different exec platform -- the
+    // TODO in BazelRuleClassProvider.getShellExecutableForOs is about exactly that -- and what is
+    // or is not installed here says nothing about what is installed there. Windows is left alone
+    // as well: there is no /bin/sh there to fall back to.
+    if (os != OS.getCurrent() || os == OS.WINDOWS || shell.equals(POSIX_SHELL)) {
+      return Optional.of(shell);
+    }
+    return Optional.of(new File(shell.getPathString()).canExecute() ? shell : POSIX_SHELL);
   }
 
   /* Returns the default shell from build options if set explicitly. */
