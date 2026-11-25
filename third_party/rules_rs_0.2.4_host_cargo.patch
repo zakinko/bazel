@@ -1,7 +1,26 @@
+diff --git a/rs/private/host_cargo_repository.bzl b/rs/private/host_cargo_repository.bzl
+--- a/rs/private/host_cargo_repository.bzl
++++ b/rs/private/host_cargo_repository.bzl
+@@ -1,12 +1,13 @@
+ """Expose the selected host Cargo label."""
+ 
+ def _host_cargo_repository_impl(rctx):
+-    rctx.file("defs.bzl", 'RS_HOST_CARGO_LABEL = Label("%s")' % rctx.attr.cargo)
++    cargo = 'Label("%s")' % rctx.attr.cargo if rctx.attr.cargo else "None"
++    rctx.file("defs.bzl", "RS_HOST_CARGO_LABEL = " + cargo)
+     rctx.file("BUILD.bazel", 'exports_files(["defs.bzl"])')
+ 
+     return rctx.repo_metadata(reproducible = True)
+ 
+ host_cargo_repository = repository_rule(
+     implementation = _host_cargo_repository_impl,
+-    attrs = {"cargo": attr.label(allow_single_file = True, mandatory = True)},
++    attrs = {"cargo": attr.label(allow_single_file = True)},
+ )
 diff --git a/rs/private/toolchains_repository.bzl b/rs/private/toolchains_repository.bzl
 --- a/rs/private/toolchains_repository.bzl
 +++ b/rs/private/toolchains_repository.bzl
-@@ -8,7 +8,7 @@
+@@ -8,7 +8,7 @@ alias(
      tags = ["manual"],
      visibility = ["//visibility:public"],
  )
@@ -10,7 +29,7 @@ diff --git a/rs/private/toolchains_repository.bzl b/rs/private/toolchains_reposi
      )
  
      rctx.file(
-@@ -71,7 +71,7 @@
+@@ -71,7 +71,7 @@ toolchains_repository = repository_rule(
      implementation = _toolchains_repository_impl,
      attrs = {
          "version": attr.string(mandatory = True),
@@ -22,7 +41,7 @@ diff --git a/rs/private/toolchains_repository.bzl b/rs/private/toolchains_reposi
 diff --git a/rs/toolchains/module_extension.bzl b/rs/toolchains/module_extension.bzl
 --- a/rs/toolchains/module_extension.bzl
 +++ b/rs/toolchains/module_extension.bzl
-@@ -484,35 +484,36 @@
+@@ -484,31 +484,34 @@ def _toolchains_impl(mctx):
                  urls = urls,
              )
  
@@ -64,19 +83,13 @@ diff --git a/rs/toolchains/module_extension.bzl b/rs/toolchains/module_extension
 -    else:
 +    elif version_tags and version_tags[0].version in host_repos:
          host_cargo = "@%s//:bin/cargo%s" % (host_repos[version_tags[0].version].cargo, host_exe_suffix)
--    host_cargo_repository(
--        name = "host_cargo",
--        cargo = host_cargo,
--    )
-+    if host_cargo:
-+        host_cargo_repository(
-+            name = "host_cargo",
-+            cargo = host_cargo,
-+        )
- 
-     toolchain_labels_repository(name = "rust_toolchain_labels")
- 
-@@ -522,9 +523,10 @@
++
++    # rules_rs imports this repository on every host, so it must exist even
++    # where there is no Cargo to point it at.
+     host_cargo_repository(
+         name = "host_cargo",
+         cargo = host_cargo,
+@@ -522,9 +525,10 @@ def _toolchains_impl(mctx):
      direct_deps = ["host_cargo", "rust_toolchain_labels"] if root_module_name == "rules_rs" else []
      direct_dev_deps = []
      for tag in version_tags:
